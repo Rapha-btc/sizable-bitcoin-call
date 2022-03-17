@@ -1,4 +1,5 @@
-https://devpost.com/software/stacks-covered-calls
+Created for 2022 Clarity Universe Hackathon https://devpost.com/software/stacks-covered-calls
+![Options involve price and time!](https://user-images.githubusercontent.com/28972498/158882895-421eaad3-5ad6-42e5-96a4-faf7111292db.jpg)
 
 <h1>Inspiration</h1>
 The Stacks ecosystem is a vibrant community that is quickly adding necessary systems and primitives to allow for a multitude of decentralized financial actions. For example decentralized exchanges are only months old. While NFT marketplaces have been very quick to fill a need of buying and selling NFTs, they do not allow holders of NFTs to make a more nuanced decisions about their assets other than a price to buy or sell.
