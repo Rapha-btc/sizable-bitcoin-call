@@ -23,37 +23,26 @@
 (define-constant ERR-UNABLE-TO-TRANSFER-EXERCISING-ASSET (err u1012))
 (define-constant ERR-UNABLE-TO-TRANSFER-UNDERLYING-ASSET (err u1013))
 
-
 (define-constant WRAPPED-USDC-OWNER 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)
 ;; data maps and vars
 ;;
 (define-non-fungible-token stx-covered-call uint)
-(define-data-var last-token-id uint u0)
+(define-data-var last-call-id uint u0)
 
-(define-map nft-covered-calls uint { 
-        counterparty : principal,
-        underlying-quantity : uint,
-        strike-price-wrapped-usdc: uint,
+(define-map call-id-to-call-data uint { 
+        counterparty: principal,
+        underlying-quantity: uint,
+        strike-price-usdc: uint,
         strike-date-block-height: uint,
-        is-exercised: bool
     }
 )
 
-(define-map counterparty-token-ids principal (list 1000 uint))
-
 ;; private functions
 ;;
-
-;; public functions
-;;
-(define-read-only (get-counterparty-token-ids (counterparty principal))
-   (map-get? counterparty-token-ids counterparty)
-)
-
 (define-private (is-expired (token-id uint))
     (let 
         (
-            (call-data (unwrap-panic (map-get? nft-covered-calls token-id)))
+            (call-data (unwrap-panic (map-get? call-id-to-call-data token-id)))
         )
         (> block-height (get strike-date-block-height call-data))
     )    
@@ -62,18 +51,17 @@
 (define-private (is-underlying-claimable (token-id uint))
     (let 
         (
-            (call-data (unwrap-panic (map-get? nft-covered-calls token-id)))
+            (call-data (unwrap-panic (map-get? call-id-to-call-data token-id)))
         )
-        (and (> block-height (get strike-date-block-height call-data)) (not (get is-exercised call-data)))
+        (> block-height (get strike-date-block-height call-data))
     )    
 )
 
-(define-read-only (get-counterparty-expired-token-ids (counterparty principal))
-    (filter is-expired (unwrap-panic (get-counterparty-token-ids counterparty)))
-)
+;; public functions
+;;
 
 (define-read-only (get-last-token-id)
-    (ok (var-get last-token-id))
+    (ok (var-get last-call-id))
 )
 
 (define-read-only (get-token-uri (token-id uint))
@@ -85,7 +73,7 @@
 )
 
 (define-read-only (get-covered-call-data (token-id uint))
-    (map-get? nft-covered-calls token-id)
+    (map-get? call-id-to-call-data token-id)
 )
 
 (define-public (transfer (token-id uint) (sender principal) (recipient principal))
@@ -97,48 +85,30 @@
 
 (define-public (mint
    (underlying-quantity uint) 
-   (strike-price-wrapped-usdc uint) 
+   (strike-price-usdc uint) 
    (strike-date-block-height uint)) 
    (let
         (
-            (token-id (+ (var-get last-token-id) u1))
+            (token-id (+ (var-get last-call-id) u1))
         )
         (asserts! (>= (stx-get-balance tx-sender) underlying-quantity) ERR-INSUFFICIENT-UNDERLYING-BALANCE)
         (asserts! (>= strike-date-block-height block-height) ERR-STRIKE-DATE-BLOCK-HEIGHT-IN-PAST)
-        (asserts! (> strike-price-wrapped-usdc u0) ERR-STRIKE-PRICE-IS-ZERO)
+        (asserts! (> strike-price-usdc u0) ERR-STRIKE-PRICE-IS-ZERO)
 ;;      (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-OWNER-ONLY)
         (try! (nft-mint? stx-covered-call token-id tx-sender))
-        (map-set nft-covered-calls token-id
+        (map-set call-id-to-call-data token-id
             { 
                 counterparty : tx-sender,
                 underlying-quantity : underlying-quantity,
-                strike-price-wrapped-usdc: strike-price-wrapped-usdc,
-                strike-date-block-height: strike-date-block-height,
-                is-exercised : false
+                strike-price-usdc: strike-price-usdc,
+                strike-date-block-height: strike-date-block-height
             }
         )
-        (let 
-            (
-                (existing-token-ids (default-to (list) (map-get? counterparty-token-ids tx-sender)))
-            )
-            (map-set counterparty-token-ids tx-sender (unwrap-panic (as-max-len? (append existing-token-ids token-id) u1000)))
-        )
-        (var-set last-token-id token-id)
+        (var-set last-call-id token-id)
         (unwrap! (stx-transfer? underlying-quantity tx-sender (as-contract tx-sender)) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET)
         (ok token-id)
     )
 )
-
-
-;; (define-private is-counterparty )
-;; (define-read-only (get-derivatives-of-coutnerparty (counterparty principal))
-   
-;; )
-
-;; ;; retreive-underlying:: this function will allow any principal to claim their locked underlying tokens for all unexercised contracts past exercise date
-;; (define-public (retreive-underlying (counterparty principal))
-;;    (ok true)
-;; )
 
 (define-public (exercise 
     (wrapped-usdc-contract <wrapped-usdc-trait>)
@@ -150,14 +120,12 @@
             (counterparty (get counterparty covered-call-data))
             (underlying-quantity (get underlying-quantity covered-call-data))
             (strike-date-block-height (get strike-date-block-height covered-call-data))
-            (strike-price-wrapped-usdc (get strike-price-wrapped-usdc covered-call-data))
-            (exercise-quantity-wrapped-usdc (* underlying-quantity strike-price-wrapped-usdc))
-            (is-exercised (get is-exercised covered-call-data))
+            (strike-price-usdc (get strike-price-usdc covered-call-data))
+            (exercise-quantity-wrapped-usdc (* underlying-quantity strike-price-usdc))
             (exercise-principal tx-sender)
         )
         ;; TODO - is this check sufficient to ensure that we do not have an imposter coin?
         ;;(asserts! (is-eq (contract-of wrapped-usdc-contract) WRAPPED-USDC-OWNER) ERR-INVALID-USDC-PRINCIPAL)
-        (asserts! (not is-exercised) ERR-ALREADY-EXERCISED)
         (asserts! (is-eq (unwrap! (nft-get-owner? stx-covered-call covered-call-token-id) ERR-TOKEN-ID-NOT-FOUND) tx-sender) ERR-NOT-TOKEN-OWNER)
         (asserts! (>= strike-date-block-height block-height) ERR-TOKEN-EXPIRED)
         (asserts! (>= (unwrap-panic (contract-call? wrapped-usdc-contract get-balance tx-sender)) exercise-quantity-wrapped-usdc) ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE)
@@ -170,7 +138,7 @@
         (try! (as-contract (stx-transfer? underlying-quantity tx-sender exercise-principal)))
         
         ;; mark the call as exercised
-        (map-set nft-covered-calls covered-call-token-id (merge covered-call-data { is-exercised: true}))
+        (map-delete call-id-to-call-data covered-call-token-id)
         (ok true)
     )
 )

@@ -57,14 +57,8 @@ Clarinet.test({
         const coveredCallData: { [key: string]: any } = coveredCallDataResult.result.expectSome().expectTuple();
         coveredCallData['counterparty'].expectPrincipal(wallet1.address);
         coveredCallData['underlying-quantity'].expectUint(100);
-        coveredCallData['strike-price-wrapped-usdc'].expectUint(2000000);
+        coveredCallData['strike-price-usdc'].expectUint(2000000);
         coveredCallData['strike-date-block-height'].expectUint(1000);
-        coveredCallData['is-exercised'].expectBool(false);
-
-        let counterPartyTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-token-ids', [types.principal(wallet1.address)], deployer.address);
-        const counterPartyTokenIds: any[ ] = counterPartyTokenIdsResult.result.expectSome().expectList();
-        assertEquals(counterPartyTokenIds.length, 1);
-        counterPartyTokenIds[0].expectUint(1);
     }
 })
 
@@ -95,87 +89,20 @@ Clarinet.test({
         let coveredCallData: { [key: string]: any } = coveredCallDataResult.result.expectSome().expectTuple();
         coveredCallData['counterparty'].expectPrincipal(wallet1.address);
         coveredCallData['underlying-quantity'].expectUint(100);
-        coveredCallData['strike-price-wrapped-usdc'].expectUint(2000000);
+        coveredCallData['strike-price-usdc'].expectUint(2000000);
         coveredCallData['strike-date-block-height'].expectUint(1000);
-        coveredCallData['is-exercised'].expectBool(false);
-
-        let counterPartyTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-token-ids', [types.principal(wallet1.address)], deployer.address);
-        let counterPartyTokenIds: any[ ] = counterPartyTokenIdsResult.result.expectSome().expectList();
-        assertEquals(counterPartyTokenIds.length, 1);
-        counterPartyTokenIds[0].expectUint(1);
 
         coveredCallDataResult = chain.callReadOnlyFn('covered-call', 'get-covered-call-data', [types.uint(2)], deployer.address);
         coveredCallData = coveredCallDataResult.result.expectSome().expectTuple();
         coveredCallData['counterparty'].expectPrincipal(wallet2.address);
         coveredCallData['underlying-quantity'].expectUint(200);
-        coveredCallData['strike-price-wrapped-usdc'].expectUint(4000000);
+        coveredCallData['strike-price-usdc'].expectUint(4000000);
         coveredCallData['strike-date-block-height'].expectUint(2000);
-        coveredCallData['is-exercised'].expectBool(false);
-
-        counterPartyTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-token-ids', [types.principal(wallet2.address)], deployer.address);
-        counterPartyTokenIds = counterPartyTokenIdsResult.result.expectSome().expectList();
-        assertEquals(counterPartyTokenIds.length, 1);
-        counterPartyTokenIds[0].expectUint(2);
     }
 })
 
 Clarinet.test({
-    name: "Mint::DifferentExpirations",
-    async fn(chain: Chain, accounts: Map<string, Account>) {
-        let deployer = accounts.get('deployer')!;
-        let wallet1 = accounts.get('wallet_1')!;
-        let wallet2 = accounts.get('wallet_2')!;
-        
-        let block = chain.mineBlock([
-            Tx.contractCall('covered-call', 'mint', [types.uint(100), types.uint(2000000), types.uint(2)], wallet1.address),
-            Tx.contractCall('covered-call', 'mint', [types.uint(100), types.uint(3000000), types.uint(2)], wallet2.address)            
-        ]);
-        
-        assertEquals(block.receipts.length, 2);
-        assertEquals(block.height, 2);
-        block.receipts[0].result.expectOk();
-
-        block = chain.mineBlock([
-            Tx.contractCall('covered-call', 'mint', [types.uint(100), types.uint(2000000), types.uint(4)], wallet1.address)
-        ]);
-
-        assertEquals(block.receipts.length, 1);
-        assertEquals(block.height, 3);
-        block.receipts[0].result.expectOk();
-
-        let counterPartyTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-token-ids', [types.principal(wallet1.address)], deployer.address);
-        const counterPartyTokenIds: any[ ] = counterPartyTokenIdsResult.result.expectSome().expectList();
-        assertEquals(counterPartyTokenIds.length, 2);
-        counterPartyTokenIds[0].expectUint(1);
-        counterPartyTokenIds[1].expectUint(3); // wallet2 minted token-id 2 so it is not in list
-
-        let counterPartyExpiredTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-expired-token-ids', [types.principal(wallet1.address)], deployer.address);
-        let counterPartyExpiredTokenIds: any[ ] = counterPartyExpiredTokenIdsResult.result.expectList();
-        assertEquals(counterPartyExpiredTokenIds.length, 1);
-        counterPartyExpiredTokenIds[0].expectUint(1);
-
-        let emptyBlock = chain.mineEmptyBlock(1);
-        assertEquals(emptyBlock.block_height, 4); // no change to exired list, we have not advanced far enough
-
-        counterPartyExpiredTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-expired-token-ids', [types.principal(wallet1.address)], deployer.address);
-        counterPartyExpiredTokenIds = counterPartyExpiredTokenIdsResult.result.expectList();
-        assertEquals(counterPartyExpiredTokenIds.length, 1); // only first token in list
-        counterPartyExpiredTokenIds[0].expectUint(1);
-
-        emptyBlock = chain.mineEmptyBlock(1);
-        assertEquals(emptyBlock.block_height, 5); // second token now expired
-
-        counterPartyExpiredTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-expired-token-ids', [types.principal(wallet1.address)], deployer.address);
-        counterPartyExpiredTokenIds = counterPartyExpiredTokenIdsResult.result.expectList();
-        assertEquals(counterPartyExpiredTokenIds.length, 2); // both tokens now in list
-        counterPartyExpiredTokenIds[0].expectUint(1);
-        counterPartyExpiredTokenIds[1].expectUint(3);
-    }
-})
-
-
-Clarinet.test({
-    name: "Mint::SuccessTransferAndExercise",
+    name: "Mint::SuccessTransfer",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         let deployer = accounts.get('deployer')!;
         let wallet1 = accounts.get('wallet_1')!;
@@ -196,14 +123,8 @@ Clarinet.test({
         const coveredCallData: { [key: string]: any } = coveredCallDataResult.result.expectSome().expectTuple();
         coveredCallData['counterparty'].expectPrincipal(wallet1.address);
         coveredCallData['underlying-quantity'].expectUint(100);
-        coveredCallData['strike-price-wrapped-usdc'].expectUint(2000000);
+        coveredCallData['strike-price-usdc'].expectUint(2000000);
         coveredCallData['strike-date-block-height'].expectUint(1000);
-        coveredCallData['is-exercised'].expectBool(false);
-
-        let counterPartyTokenIdsResult = chain.callReadOnlyFn('covered-call', 'get-counterparty-token-ids', [types.principal(wallet1.address)], deployer.address);
-        const counterPartyTokenIds: any[ ] = counterPartyTokenIdsResult.result.expectSome().expectList();
-        assertEquals(counterPartyTokenIds.length, 1);
-        counterPartyTokenIds[0].expectUint(1);
 
         block = chain.mineBlock([
             Tx.contractCall('covered-call', 'transfer', [types.uint(1), types.principal(wallet1.address), types.principal(wallet2.address)], wallet1.address)            
