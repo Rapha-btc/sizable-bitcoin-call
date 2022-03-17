@@ -1,4 +1,6 @@
-Inspiration
+https://devpost.com/software/stacks-covered-calls
+
+<h1>Inspiration</h1>
 The Stacks ecosystem is a vibrant community that is quickly adding necessary systems and primitives to allow for a multitude of decentralized financial actions. For example decentralized exchanges are only months old. While NFT marketplaces have been very quick to fill a need of buying and selling NFTs, they do not allow holders of NFTs to make a more nuanced decisions about their assets other than a price to buy or sell.
 
 The introduction of options will significantly change the landscape of financial assets on the Stacks ecosystem. Rather than simply allowing an asset owner to place and offer to buy or sell, they incorporate a time premium into these offers to buy or sell. For both the buyer and seller of options, they potentially gain greater capital efficiency. Furthermore since we will use the blockchain as a clearing mechanism, settlement no longer has the counterparty risk that exists in traditional financial derivative markets.
