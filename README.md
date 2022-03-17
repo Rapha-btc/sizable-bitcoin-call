@@ -1,4 +1,5 @@
 Created for 2022 Clarity Universe Hackathon https://devpost.com/software/stacks-covered-calls
+
 ![Options involve price and time!](https://user-images.githubusercontent.com/28972498/158882895-421eaad3-5ad6-42e5-96a4-faf7111292db.jpg)
 
 <h1>Inspiration</h1>
