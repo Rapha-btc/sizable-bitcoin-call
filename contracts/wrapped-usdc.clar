@@ -1,27 +1,19 @@
 (impl-trait .sip010-ft-trait.sip010-ft-trait)
 
-;; SIP010 trait on mainnet
-;; (impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
-
 ;; wrapped-usdc
 ;; <add a description here>
 
 ;; constants
 ;;
-
 (define-constant contract-owner tx-sender)
 (define-constant ERR-OWNER-ONLY (err u100))
 (define-constant ERR-NOT-TOKEN-OWNER (err u101))
 (define-fungible-token wrapped-usdc)
 
-;; data maps and vars
-;;
-
-;; private functions
-;;
-
 ;; public functions
 ;;
+
+;; #[allow(unchecked_data)]
 (define-public (transfer (amount uint) (sender principal) (recipient principal) (memo (optional (buff 34))))
     (begin
         (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER)
@@ -55,6 +47,7 @@
     (ok none)
 )
 
+;; #[allow(unchecked_data)]
 (define-public (mint (amount uint) (recipient principal))
     (begin
         (asserts! (is-eq tx-sender contract-owner) ERR-OWNER-ONLY)

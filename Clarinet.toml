@@ -1,14 +1,14 @@
 [project]
 name = "covered-call"
-authors = []
-description = ""
+authors = ["cargocult"]
+description = "This contract allows for the creation, transfer, exercise, and underlying reclamation needed for covered calls"
 telemetry = true
 requirements = []
 analysis = ["check_checker"]
 costs_version = 2
 [contracts.covered-call]
 path = "contracts/covered-call.clar"
-depends_on = ["sip010-ft-trait", "sip009-nft-trait"]
+depends_on = ["sip010-ft-trait", "sip009-nft-trait", "wrapped-usdc"]
 
 [contracts.sip009-nft-trait]
 path = "contracts/sip009-nft-trait.clar"

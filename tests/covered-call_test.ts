@@ -6,6 +6,7 @@ const defaultNftAssetContract = 'covered-call';
 const defaultPaymentAssetContract = 'wrapped-usdc';
 
 const contractPrincipal = (deployer: Account) => `${deployer.address}.${contractName}`;
+const paymentAssetPrincipal = (deployer: Account) => `${deployer.address}.${defaultPaymentAssetContract}`;
 
 interface Sip009NftTransferEvent {
     type: string,
@@ -20,7 +21,6 @@ interface Sip009NftTransferEvent {
 function assertNftTransfer(event: Sip009NftTransferEvent, nftAssetContract: string, tokenId: number, sender: string, recipient: string) {
     assertEquals(typeof event, 'object');
     assertEquals(event.type, 'nft_transfer_event');
-    console.log(event.nft_transfer_event.asset_identifier);
     assertEquals(event.nft_transfer_event.asset_identifier.split('.')[1].substr(0, nftAssetContract.length), nftAssetContract);
     event.nft_transfer_event.sender.expectPrincipal(sender);
     event.nft_transfer_event.recipient.expectPrincipal(recipient);
@@ -102,14 +102,14 @@ Clarinet.test({
 })
 
 Clarinet.test({
-    name: "Mint::SuccessTransfer",
+    name: "Exercise::Success",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         let deployer = accounts.get('deployer')!;
         let wallet1 = accounts.get('wallet_1')!;
         let wallet2 = accounts.get('wallet_2')!;
         
         let block = chain.mineBlock([
-            Tx.contractCall('covered-call', 'mint', [types.uint(100), types.uint(2000000), types.uint(1000)], wallet1.address)            
+            Tx.contractCall('covered-call', 'mint', [types.uint(100000000), types.uint(2000000), types.uint(1000)], wallet1.address)            
         ]);
         
         assertEquals(block.receipts.length, 1);
@@ -122,7 +122,140 @@ Clarinet.test({
         let coveredCallDataResult = chain.callReadOnlyFn('covered-call', 'get-covered-call-data', [types.uint(1)], deployer.address);
         const coveredCallData: { [key: string]: any } = coveredCallDataResult.result.expectSome().expectTuple();
         coveredCallData['counterparty'].expectPrincipal(wallet1.address);
-        coveredCallData['underlying-quantity'].expectUint(100);
+        coveredCallData['underlying-quantity'].expectUint(100000000);
+        coveredCallData['strike-price-usdc'].expectUint(2000000);
+        coveredCallData['strike-date-block-height'].expectUint(1000);
+
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'transfer', [types.uint(1), types.principal(wallet1.address), types.principal(wallet2.address)], wallet1.address)            
+        ])        
+
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 3);
+        block.receipts[0].result.expectOk();
+        
+        assertNftTransfer(block.receipts[0].events[0], defaultNftAssetContract, 1, wallet1.address, wallet2.address);
+
+        let emptyBlock = chain.mineEmptyBlockUntil(50);
+        assertEquals(emptyBlock.block_height, 50);
+
+        block = chain.mineBlock([
+            Tx.contractCall('wrapped-usdc', 'mint', [types.uint(300000000), types.principal(wallet2.address)], deployer.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 51);
+        block.receipts[0].result.expectOk();
+        
+        let assets = chain.getAssetsMaps().assets;
+        assertEquals(assets['STX'][wallet1.address], 99999900000000);
+        assertEquals(assets['.wrapped-usdc.wrapped-usdc'][wallet2.address], 300000000);
+
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'exercise', [types.principal(paymentAssetPrincipal(deployer)), types.uint(1)], wallet2.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 52);
+        block.receipts[0].result.expectOk();
+     
+        assets = chain.getAssetsMaps().assets;
+        assertEquals(assets['STX'][wallet1.address], 99999900000000);
+        assertEquals(assets['STX'][wallet2.address], 100000100000000);
+        assertEquals(assets['.wrapped-usdc.wrapped-usdc'][wallet1.address], 200000000);
+        assertEquals(assets['.wrapped-usdc.wrapped-usdc'][wallet2.address], 100000000);
+    }
+})
+
+Clarinet.test({
+    name: "Exercise::Fails",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        let deployer = accounts.get('deployer')!;
+        let wallet1 = accounts.get('wallet_1')!;
+        let wallet2 = accounts.get('wallet_2')!;
+   
+        // token-id does not exist
+        let block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'exercise', [types.principal(paymentAssetPrincipal(deployer)), types.uint(1)], wallet2.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 2);
+        block.receipts[0].result.expectErr().expectUint(1007); // token not found
+
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'mint', [types.uint(100000000), types.uint(2000000), types.uint(1000)], wallet1.address)            
+        ]);
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 3);
+        block.receipts[0].result.expectOk();
+
+        // tx-sender does not own token-id
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'exercise', [types.principal(paymentAssetPrincipal(deployer)), types.uint(1)], wallet2.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 4);
+        block.receipts[0].result.expectErr().expectUint(1001); // not token owner
+
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'transfer', [types.uint(1), types.principal(wallet1.address), types.principal(wallet2.address)], wallet1.address)            
+        ])        
+
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 5);
+        block.receipts[0].result.expectOk();
+
+        // tx-sender insufficient funds to exercise
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'exercise', [types.principal(paymentAssetPrincipal(deployer)), types.uint(1)], wallet2.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 6);
+        block.receipts[0].result.expectErr().expectUint(1008); // insufficient funds
+
+        block = chain.mineBlock([
+            Tx.contractCall('wrapped-usdc', 'mint', [types.uint(300000000), types.principal(wallet2.address)], deployer.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 7);
+        block.receipts[0].result.expectOk();
+
+        let emptyBlock = chain.mineEmptyBlockUntil(1001);
+        assertEquals(emptyBlock.block_height, 1001);
+
+        // contract expired
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'exercise', [types.principal(paymentAssetPrincipal(deployer)), types.uint(1)], wallet2.address)            
+        ])
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 1002);
+        block.receipts[0].result.expectErr().expectUint(1006); // token expired
+    }
+})
+
+Clarinet.test({
+    name: "UnderlyingClaim::Success",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        let deployer = accounts.get('deployer')!;
+        let wallet1 = accounts.get('wallet_1')!;
+        let wallet2 = accounts.get('wallet_2')!;
+        
+        let block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'mint', [types.uint(100000000), types.uint(2000000), types.uint(1000)], wallet1.address)            
+        ]);
+        
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 2);
+        block.receipts[0].result.expectOk();
+        
+        let coveredCallOwnerResult = chain.callReadOnlyFn('covered-call', 'get-owner', [types.uint(1)], deployer.address);
+        coveredCallOwnerResult.result.expectOk().expectSome().expectPrincipal(wallet1.address);
+
+        let assets = chain.getAssetsMaps().assets;
+        assertEquals(assets['STX'][wallet1.address], 99999900000000);
+
+        let coveredCallDataResult = chain.callReadOnlyFn('covered-call', 'get-covered-call-data', [types.uint(1)], deployer.address);
+        const coveredCallData: { [key: string]: any } = coveredCallDataResult.result.expectSome().expectTuple();
+        coveredCallData['counterparty'].expectPrincipal(wallet1.address);
+        coveredCallData['underlying-quantity'].expectUint(100000000);
         coveredCallData['strike-price-usdc'].expectUint(2000000);
         coveredCallData['strike-date-block-height'].expectUint(1000);
 
@@ -139,12 +272,85 @@ Clarinet.test({
         let emptyBlock = chain.mineEmptyBlockUntil(1001);
         assertEquals(emptyBlock.block_height, 1001);
 
+        let claimableResult = chain.callReadOnlyFn('covered-call', 'is-underlying-claimable', [types.uint(1)], wallet1.address);
+        assertEquals(claimableResult.result, 'true');
+
         block = chain.mineBlock([
-            Tx.contractCall('wrapped-usdc', 'mint', [types.uint(300000000), types.principal(wallet2.address)], deployer.address)            
-        ])
-        
-        assertEquals(chain.getAssetsMaps().assets['.wrapped-usdc.wrapped-usdc']['ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG'], 300000000);
+            Tx.contractCall('covered-call', 'counterparty-reclaim-underlying', [types.uint(1)], wallet1.address)            
+        ])        
+
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 1002);
+        block.receipts[0].result.expectOk();
+
+        assets = chain.getAssetsMaps().assets;
+        assertEquals(assets['STX'][wallet1.address], 100000000000000);
     }
 })
 
+Clarinet.test({
+    name: "UnderlyingClaim::Failures",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        let deployer = accounts.get('deployer')!;
+        let wallet1 = accounts.get('wallet_1')!;
+        let wallet2 = accounts.get('wallet_2')!;
+        
+        let block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'mint', [types.uint(100000000), types.uint(2000000), types.uint(1000)], wallet1.address)            
+        ]);
+        
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 2);
+        block.receipts[0].result.expectOk();
+        
+        let coveredCallOwnerResult = chain.callReadOnlyFn('covered-call', 'get-owner', [types.uint(1)], deployer.address);
+        coveredCallOwnerResult.result.expectOk().expectSome().expectPrincipal(wallet1.address);
+
+        let assets = chain.getAssetsMaps().assets;
+        assertEquals(assets['STX'][wallet1.address], 99999900000000);
+
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'transfer', [types.uint(1), types.principal(wallet1.address), types.principal(wallet2.address)], wallet1.address)            
+        ])        
+
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 3);
+        block.receipts[0].result.expectOk();
+        
+        assertNftTransfer(block.receipts[0].events[0], defaultNftAssetContract, 1, wallet1.address, wallet2.address);
+
+        // id not found
+        let claimableResult = chain.callReadOnlyFn('covered-call', 'is-underlying-claimable', [types.uint(2)], wallet1.address);
+        assertEquals(claimableResult.result, 'false');
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'counterparty-reclaim-underlying', [types.uint(2)], wallet1.address)            
+        ])        
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 4);
+        block.receipts[0].result.expectErr().expectUint(1007); // id not found
+
+        // not expired
+        claimableResult = chain.callReadOnlyFn('covered-call', 'is-underlying-claimable', [types.uint(1)], wallet1.address);
+        assertEquals(claimableResult.result, 'false');
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'counterparty-reclaim-underlying', [types.uint(1)], wallet1.address)            
+        ])        
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 5);
+        block.receipts[0].result.expectErr().expectUint(1014); // not expired
+
+        let emptyBlock = chain.mineEmptyBlockUntil(1001);
+        assertEquals(emptyBlock.block_height, 1001);
+
+        // not counterparty
+        claimableResult = chain.callReadOnlyFn('covered-call', 'is-underlying-claimable', [types.uint(1)], wallet2.address);
+        assertEquals(claimableResult.result, 'false');
+        block = chain.mineBlock([
+            Tx.contractCall('covered-call', 'counterparty-reclaim-underlying', [types.uint(1)], wallet2.address)            
+        ])        
+        assertEquals(block.receipts.length, 1);
+        assertEquals(block.height, 1002);
+        block.receipts[0].result.expectErr().expectUint(1015); // not counterparty
+    }
+})
 
