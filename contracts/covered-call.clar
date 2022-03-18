@@ -175,20 +175,11 @@
         (asserts! (< strike-date-block-height block-height) ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-EXPIRED)
         (asserts! (is-eq counterparty tx-sender) ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-COUNTERPARTY)
         (try! (as-contract (stx-transfer? underlying-quantity tx-sender counterparty)))
-        
-        ;; NOTE tx-sender cannot burn these tokens on behalf of call-id owner 
-        ;; Once we have SIP-018 we can have a TX pre signed to auto burn from call-id owner
-        ;; https://github.com/stacksgov/sips/pull/57
-        ;; (try! (nft-burn? stx-covered-call call-id tx-sender))
-        
+        (try! (nft-burn? stx-covered-call call-id (unwrap-panic (nft-get-owner? stx-covered-call call-id))))
         (ok (map-delete call-id-to-call-data call-id))
     )    
 )
 
 (define-public (counterparty-reclaim-underlying-many (call-ids (list 200 uint)))
    (fold counterparty-reclaim-underlying call-ids (ok true))
-)
-
-(define-read-only (foo (call-ids (list 200 uint)))
-   (ok call-ids)
 )
