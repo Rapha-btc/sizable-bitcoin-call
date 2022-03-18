@@ -2,7 +2,30 @@
 (impl-trait .sip009-nft-trait.sip009-nft-trait)
 
 ;; covered-call
-;; <add a description here>
+;; This is a proof of concept contact to show how a covered call might be implemented such that the contract eliminates counterparty risk
+;; For more information about what a covered call represents, please see the README.md 
+
+;; We have put in place a number of restrictions on the covered call
+;; * underlying currency can only be STX
+;; * underlying quantity is multiples of 100 STX
+;; * strike price currency is USDC
+;; * strike date is represented as a block height
+;; all of these constraints could be potentially relaxed in a more genereal implementation
+
+;; Standard options typically have a fixed underlying quantity of 100 units and predefined strike price increments.  
+;; While we have not imposed those restrictions that may make sense to add to improve call liquidity and fungibility.
+
+;; There are 4 basic functions that this contract facilitates
+;; Allow a principal to create a call - this is represented as minting an SIP-009 token and locking the underlying asset in the contract
+;; As the call is represented as a SIP-009 token this provides:
+;; * call creator to transfer the call 
+;; * call creator to list call on SIP-009 marketplace
+;; Allow the call owner to exercise the option - this will require that contract sends underlying assete to call owner and exercise USDC sent to call creator
+;; Allow the call creator to reclaim underlying capital once strike date has elapsed and call owner did not elect to exercise 
+
+;; Currently exercising / underlying reclamation is required to be done by the relevant principals.  This could potentially be improved with SIP-018 and the addition of a price oracle
+
+;; Additonally, block height may be better expressed as a wall clock datetime.  If so an oracle would also be needed.
 
 ;; constants
 ;;
@@ -22,9 +45,11 @@
 (define-constant ERR-UNABLE-TO-TRANSFER-UNDERLYING-ASSET (err u1013))
 (define-constant ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-EXPIRED (err u1014))
 (define-constant ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-COUNTERPARTY (err u1015))
+(define-constant ERR-QUANTITY-NOT-ROUND-LOT (err u1016)) ;; ROUND-LOT means multiple of 100
 
 ;; NOTE: creating wrapped STX SIP-010 may be desirable to handle decimal scaling implicitly
 (define-constant STX_DISPLAY_FACTOR u1000000)
+(define-constant STX_ROUND_LOT_FACTOR u100000000)
 (define-constant WRAPPED-USDC-PRINCIPAL 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.wrapped-usdc)
 
 ;; data maps and vars
@@ -45,7 +70,12 @@
 
 ;; public functions
 ;;
-(define-read-only (is-underlying-claimable (call-id uint))
+
+(define-read-only (quantity-is-round-lot (quantity uint))
+    (is-eq quantity (* (/ quantity STX_ROUND_LOT_FACTOR) STX_ROUND_LOT_FACTOR))
+)
+
+(define-read-only (underlying-is-claimable (call-id uint))
     (let 
         (
             (call-data (unwrap! (map-get? call-id-to-call-data call-id) false))
@@ -91,6 +121,7 @@
         (asserts! (>= (stx-get-balance tx-sender) underlying-quantity) ERR-INSUFFICIENT-UNDERLYING-BALANCE)
         (asserts! (>= strike-date-block-height block-height) ERR-STRIKE-DATE-BLOCK-HEIGHT-IN-PAST)
         (asserts! (> strike-price-usdc u0) ERR-STRIKE-PRICE-IS-ZERO)
+        (asserts! (quantity-is-round-lot underlying-quantity) ERR-QUANTITY-NOT-ROUND-LOT)
         (try! (nft-mint? stx-covered-call token-id tx-sender))
         (map-set call-id-to-call-data token-id
             { 
@@ -133,7 +164,7 @@
 )
 
 ;; #[allow(unchecked_data)]
-(define-public (counterparty-reclaim-underlying (call-id uint))
+(define-private (counterparty-reclaim-underlying (call-id uint) (previous (response bool uint)))
     (let 
         (
             (covered-call-data (unwrap! (get-covered-call-data call-id) ERR-TOKEN-ID-NOT-FOUND))
@@ -152,4 +183,12 @@
         
         (ok (map-delete call-id-to-call-data call-id))
     )    
+)
+
+(define-public (counterparty-reclaim-underlying-many (call-ids (list 200 uint)))
+   (fold counterparty-reclaim-underlying call-ids (ok true))
+)
+
+(define-read-only (foo (call-ids (list 200 uint)))
+   (ok call-ids)
 )

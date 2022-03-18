@@ -1,7 +1,8 @@
 (impl-trait .sip010-ft-trait.sip010-ft-trait)
 
 ;; wrapped-usdc
-;; <add a description here>
+;; We will use Wrapped USDC as the currency in which strike price is denominated 
+;; USDC is a stable coin that is meant to hold peg with the US Dollar and is expected to soon be in the stacks ecosystem
 
 ;; constants
 ;;
