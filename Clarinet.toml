@@ -1,23 +1,44 @@
 [project]
-name = "covered-call"
-authors = ["cargocult"]
-description = "This contract allows for the creation, transfer, exercise, and underlying reclamation needed for covered calls"
+name = 'covered-call'
+description = 'This contract allows for the creation, transfer, exercise, and underlying reclamation needed for covered calls'
+authors = ['Rafa']
 telemetry = true
+cache_dir = '.cache'
 requirements = []
-analysis = ["check_checker"]
-costs_version = 2
 [contracts.covered-call]
-path = "contracts/covered-call.clar"
-depends_on = ["sip010-ft-trait", "sip009-nft-trait", "wrapped-usdc"]
+path = 'contracts/covered-call.clar'
+clarity_version = 1
+epoch = 2.0
+
+[contracts.covered-put]
+path = 'contracts/covered-put.clar'
+clarity_version = 1
+epoch = 2.0
+
+[contracts.sbtc]
+path = 'contracts/sbtc.clar'
+clarity_version = 1
+epoch = 2.0
 
 [contracts.sip009-nft-trait]
-path = "contracts/sip009-nft-trait.clar"
-depends_on = []
+path = 'contracts/sip009-nft-trait.clar'
+clarity_version = 1
+epoch = 2.0
 
 [contracts.sip010-ft-trait]
-path = "contracts/sip010-ft-trait.clar"
-depends_on = []
+path = 'contracts/sip010-ft-trait.clar'
+clarity_version = 1
+epoch = 2.0
 
 [contracts.wrapped-usdc]
-path = "contracts/wrapped-usdc.clar"
-depends_on = ["sip010-ft-trait"]
+path = 'contracts/wrapped-usdc.clar'
+clarity_version = 1
+epoch = 2.0
+[repl.analysis]
+passes = ['check_checker']
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
