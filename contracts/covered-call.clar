@@ -1,8 +1,8 @@
-(use-trait wrapped-usdc-trait .sip010-ft-trait.sip010-ft-trait)
+(use-trait wrapped-usdc-trait .sip010-ft-trait.sip010-ft-trait) ;; why defining a trait here? so that any NFT can be passed as a parameter of exercise function? ask @Cargo
 (impl-trait .sip009-nft-trait.sip009-nft-trait)
 
 ;; covered-call
-;; This is a proof of concept contact to show how a covered call might be implemented such that the contract eliminates counterparty risk
+;; This is a proof of concept contract to show how a covered call might be implemented such that the contract eliminates counterparty risk
 ;; For more information about what a covered call represents, please see the README.md 
 
 ;; We have put in place a number of restrictions on the covered call
@@ -20,12 +20,25 @@
 ;; As the call is represented as a SIP-009 token this provides:
 ;; * call creator to transfer the call 
 ;; * call creator to list call on SIP-009 marketplace
-;; Allow the call owner to exercise the option - this will require that contract sends underlying assete to call owner and exercise USDC sent to call creator
+;; Allow the call owner to exercise the option - this will require that contract sends underlying asset to call owner and exercise USDC sent to call creator
 ;; Allow the call creator to reclaim underlying capital once strike date has elapsed and call owner did not elect to exercise 
 
 ;; Currently exercising / underlying reclamation is required to be done by the relevant principals.  This could potentially be improved with SIP-018 and the addition of a price oracle
 
 ;; Additonally, block height may be better expressed as a wall clock datetime.  If so an oracle would also be needed.
+
+;; If the option expires in the money, there is no cash-settlement mechanism.  
+;; The call owner would need to exercise the option and then sell the underlying asset on a market before the strike date.
+;; SIP-018 could be used to facilitate a cash-settlement mechanism in the future. 
+
+;; Note to self: designing an sBTC-covered put on the price of BTC would be a good next step.  
+;; Counterparty creates a put on the price of STX/BTC by locking up in the contract the sBTC amount equivalent to 100 STX.
+;; Countterparty receives a SIP-009 token representing the put.
+;; Strike is 1000 blocks in the future.
+;; Then we can offer Bitcoiners to farm stacking rewards while being hedged against a drop in the price of STX/BTC.
+
+;; USDA is now a more viable option compared to wrapped USDC, which was initially used due to its wider availability. 
+;; This is because the launch of a stable swap on ALEX has stabilized the peg of USDA, while using wrapped USDC could actually hinder our efforts to mitigate counterparty risk.
 
 ;; constants
 ;;
@@ -41,11 +54,11 @@
 (define-constant ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE (err u1008))
 (define-constant ERR-UNABLE-TO-TRANSFER-CAPITAL-TO-EXERCISE (err u1009))
 (define-constant ERR-INVALID-USDC-PRINCIPAL (err u1010))
-(define-constant ERR-UNABLE-TO-TRANSFER-EXERCISING-ASSET (err u1012))
-(define-constant ERR-UNABLE-TO-TRANSFER-UNDERLYING-ASSET (err u1013))
-(define-constant ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-EXPIRED (err u1014))
-(define-constant ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-COUNTERPARTY (err u1015))
-(define-constant ERR-QUANTITY-NOT-ROUND-LOT (err u1016)) ;; ROUND-LOT means multiple of 100
+(define-constant ERR-UNABLE-TO-TRANSFER-EXERCISING-ASSET (err u1011))
+(define-constant ERR-UNABLE-TO-TRANSFER-UNDERLYING-ASSET (err u1012))
+(define-constant ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-EXPIRED (err u1013))
+(define-constant ERR-UNABLE-TO-CLAIM-UNDERLYING-NOT-COUNTERPARTY (err u1014))
+(define-constant ERR-QUANTITY-NOT-ROUND-LOT (err u1015)) ;; ROUND-LOT means multiple of 100
 
 ;; NOTE: creating wrapped STX SIP-010 may be desirable to handle decimal scaling implicitly
 (define-constant STX_DISPLAY_FACTOR u1000000)
