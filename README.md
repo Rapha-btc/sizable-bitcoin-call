@@ -1,6 +1,6 @@
 
-- Call option bitcoin, Bitcoin is collateralized
-- Put option bitcoin, the other asset is collateralized (stx / usda)
+- Call option Bitcoin, Bitcoin is collateralized
+- Put option Bitcoin, the other asset is collateralized (stx / usda)
 
 So there is a mistake in this. Bear with me, this is just a draft.
 
