@@ -1,3 +1,10 @@
+
+- Call option bitcoin, Bitcoin is collateralized
+- Put option bitcoin, the other asset is collateralized (stx / usda)
+
+So there is a mistake in this. Bear with me, this is just a draft.
+
+
 Created for 2022 Clarity Universe Hackathon https://devpost.com/software/stacks-covered-calls
 
 ![Options involve price and time!](https://user-images.githubusercontent.com/28972498/158882895-421eaad3-5ad6-42e5-96a4-faf7111292db.jpg)
