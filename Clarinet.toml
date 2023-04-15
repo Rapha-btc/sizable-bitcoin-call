@@ -10,8 +10,8 @@ path = 'contracts/covered-call.clar'
 clarity_version = 1
 epoch = 2.0
 
-[contracts.covered-put]
-path = 'contracts/covered-put.clar'
+[contracts.bitcoin-call]
+path = 'contracts/bitcoin-call.clar'
 clarity_version = 1
 epoch = 2.0
 
