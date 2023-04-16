@@ -1,10 +1,52 @@
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+A simple exercise for beginners
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+If you are new to Clarity and would like to test the contracts, you can run "clarinet
+console" from the contracts folder and perform the following steps:
+
+1. Mint yourself 3 million satoshis (sats) from sbtc using the command:
+(contract-call? .sbtc mint u3000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)
+
+2. Mint a Bitcoin call, which is represented by a fungible token and a map. Your 3
+million sats will be transferred to the contract, but you will receive the token "u1
+bitcoin-call" using the command (strike-price = 1000 stx):
+(contract-call? .bitcoin-call mint u3000000 u1000000000)
+
+3. Get the asset maps using the command:
+::get_assets_maps
+
+4. Transfer the Bitcoin call token "u1" to a new owner, identified by their principal
+ID 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the
+command:
+(contract-call? .bitcoin-call transfer u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)
+
+5. Change the transaction sender to
+'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
+::set_tx_sender ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG
+
+6. Advance the chain tip by 5 blocks.
+
+7. Exercise the option and verify that the 3 million sats were received by the new owner using the command:
+(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-call exercise 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u1)
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+Next exercise: 
+modify the code to enable the creation of a list containing standardized options for each user, and then use the 'map' function to iterate.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 - Call option Bitcoin, Bitcoin is collateralized
 - Put option Bitcoin, the other asset is collateralized (stx / usda)
 
-So there is a mistake in this. Bear with me, this is just a draft.
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+Forked by Rafa from CargoCult's POC
 
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 Created for 2022 Clarity Universe Hackathon https://devpost.com/software/stacks-covered-calls
 
 ![Options involve price and time!](https://user-images.githubusercontent.com/28972498/158882895-421eaad3-5ad6-42e5-96a4-faf7111292db.jpg)
