@@ -8,29 +8,29 @@ If you are new to Clarity and would like to test the contracts, you can run "cla
 console" from the contracts folder and perform the following steps:
 
 1. Mint yourself 3 million satoshis (sats) from sbtc using the command:
-<h2>(contract-call? .sbtc mint u3000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)</h2>
+<h6>(contract-call? .sbtc mint u3000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)</h6>
 
 2. Mint a Bitcoin call, which is represented by a non fungible token and a map. Your 3
 million sats will be transferred to the contract, but you will receive the token "u1
 bitcoin-call" using the command (strike-price = 1000 stx):
-<h2>(contract-call? .bitcoin-call mint u3000000 u1000000000)</h2>
+<h6>(contract-call? .bitcoin-call mint u3000000 u1000000000)</h6>
 
 3. Get the asset maps using the command:
-<h2>::get_assets_maps</h2>
+<h6>::get_assets_maps</h6>
 
 4. Transfer the Bitcoin call token "u1" to a new owner, identified by their principal
 ID 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the
 command:
-<h2>(contract-call? .bitcoin-call transfer u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h2>
+<h6>(contract-call? .bitcoin-call transfer u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
 
 5. Change the transaction sender to
 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
-<h2>::set_tx_sender ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG</h2>
+<h6>::set_tx_sender ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG</h6>
 
 6. Advance the chain tip by 5 blocks.
 
 7. Exercise the option and verify that the 3 million sats were received by the new owner using the command:
-<h2>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-call exercise 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u1)</h2>
+<h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-call exercise 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u1)</h6>
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
