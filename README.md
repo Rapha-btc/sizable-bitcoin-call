@@ -10,7 +10,7 @@ console" from the contracts folder and perform the following steps:
 1. Mint yourself 3 million satoshis (sats) from sbtc using the command:
 (contract-call? .sbtc mint u3000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)
 
-2. Mint a Bitcoin call, which is represented by a fungible token and a map. Your 3
+2. Mint a Bitcoin call, which is represented by a non fungible token and a map. Your 3
 million sats will be transferred to the contract, but you will receive the token "u1
 bitcoin-call" using the command (strike-price = 1000 stx):
 (contract-call? .bitcoin-call mint u3000000 u1000000000)
