@@ -13,7 +13,7 @@ console" from the contracts folder and perform the following steps:
 2. Mint a Bitcoin call, which is represented by a non fungible token and a map. Your 3
 million sats will be transferred to the contract, but you will receive the token "u1
 bitcoin-call" using the command (strike-price = 1000 stx):
-<h6>(contract-call? .bitcoin-call mint u3000000 u1000000000)</h6>
+<h6>(contract-call? .bitcoin-call mint 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u3000000 u1000000000)</h6>
 
 3. Get the asset maps using the command:
 <h6>::get_assets_maps</h6>

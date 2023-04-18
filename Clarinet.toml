@@ -5,13 +5,13 @@ authors = ['Rafa']
 telemetry = true
 cache_dir = '.cache'
 requirements = []
-[contracts.covered-call]
-path = 'contracts/covered-call.clar'
+[contracts.bitcoin-call]
+path = 'contracts/bitcoin-call.clar'
 clarity_version = 1
 epoch = 2.0
 
-[contracts.bitcoin-call]
-path = 'contracts/bitcoin-call.clar'
+[contracts.covered-call]
+path = 'contracts/covered-call.clar'
 clarity_version = 1
 epoch = 2.0
 
@@ -29,6 +29,11 @@ epoch = 2.0
 path = 'contracts/sip010-ft-trait.clar'
 clarity_version = 1
 epoch = 2.0
+
+[contracts.sizeable-bitcoin-call]
+path = 'contracts/sizeable-bitcoin-call.clar'
+clarity_version = 2
+epoch = 2.1
 
 [contracts.wrapped-usdc]
 path = 'contracts/wrapped-usdc.clar'

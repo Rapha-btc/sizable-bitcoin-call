@@ -1,4 +1,4 @@
-(use-trait wrapped-btc-trait .sip010-ft-trait.sip010-ft-trait) ;; to be able to pass an NFT as param in exercise function, this necessary?
+(use-trait wrapped-btc-trait .sip010-ft-trait.sip010-ft-trait) ;; any wrapped btc that is a sip-10 token can be collateralized, and we are testing it here with sbtc.clar but I should have called it not-not-btc.clar in reference to Doctor $uss cultural meme
 (impl-trait .sip009-nft-trait.sip009-nft-trait) ;; covered-calls are nfts
 ;; title: covered-call.clar
 ;; version: 1.0
@@ -80,7 +80,7 @@
 ;;..........................................................................
 ;;public functions
 
-(define-public (mint (btc-locked uint) (strike-price uint)) 
+(define-public (mint (wrapped-btc-contract <wrapped-btc-trait>) (btc-locked uint) (strike-price uint)) 
    (let
         (
             (token-id (+ (var-get last-call-id) u1)) ;; increment the last call id before creating it
@@ -106,7 +106,7 @@
                 }
         )
         (var-set last-call-id token-id );; outside of the while loop, increment as many times as there are lots to lock
-        (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) ;; outside of the loop, lock all the lots at once
+        (unwrap! (contract-call? wrapped-btc-contract transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) ;; outside of the loop, lock all the lots at once
         (ok (var-get last-call-id))
     )
 )
