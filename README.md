@@ -68,6 +68,10 @@ console" from the contracts folder and perform the following steps:
 7. Exercise the option and verify that the 3 million sats were received by the new owner using the command:
 <h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call exercise 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u1)</h6>
 
+![sizeable folded](https://user-images.githubusercontent.com/6700158/234094834-d5aab652-20e3-43a6-b6b6-9bf9ea3e8d85.png)
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 - Call option Bitcoin, Bitcoin is collateralized
 - Put option Bitcoin, the other asset is collateralized (stx / usda)
 
