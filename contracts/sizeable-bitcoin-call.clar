@@ -95,11 +95,8 @@
         (unwrap! (contract-call? wrapped-btc-contract transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) ;; outside of the loop, lock all the lots at once
         ;; (ok (var-get last-call-id))
 
-        (if (is-eq (var-get user-calls) (list ))
-            (begin
-            ;; (var-set helper-list (map helper-quite-a-few indices)) ;; this has the ok u1, ok u2, ok u3, ok u4, ok u5, err u1101) and we want to map this to get u1, ... u5 and assert out if there is an error
+        (if (is-eq (var-get user-calls) (list ))   
             (var-set user-calls (filter is-null (map helper-quite-a-few indices))) ;; this spits out a list of call options token ids and updates the next-call-id
-            )
             (var-set user-calls (unwrap! (as-max-len? (concat (var-get user-calls) (filter is-null (map helper-quite-a-few indices))) u100) ERR-TOO-MANY-CALLS))
         )
         
