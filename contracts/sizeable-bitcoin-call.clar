@@ -97,15 +97,24 @@
 
         (if (is-eq (var-get user-calls) (list ))
             (begin
+            ;; (var-set helper-list (map helper-quite-a-few indices)) ;; this has the ok u1, ok u2, ok u3, ok u4, ok u5, err u1101) and we want to map this to get u1, ... u5 and assert out if there is an error
             (var-set user-calls (filter is-null (map helper-quite-a-few indices))) ;; this spits out a list of call options token ids and updates the next-call-id
             )
             (var-set user-calls (unwrap! (as-max-len? (concat (var-get user-calls) (filter is-null (map helper-quite-a-few indices))) u100) ERR-TOO-MANY-CALLS))
         )
-              
+        
+        ;; here we can fold on the user-calls and try before it to exit control flow if there is an error
+        ;; (asserts! boolean-expr (err thrown)) 
+        (unwrap! (fold check-minting-err (var-get user-calls) (ok u0)) (err "unable-to-mint"));; ERR-UNABLE-TO-MINT)
+
         (var-set last-call-id (var-get next-call-id)) ;; this allows me to keep track of the last call id 
 
         (ok (var-get user-calls))
     )
+)
+
+(define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
+   (if (is-err result) result current)  
 )
 
 
@@ -129,15 +138,16 @@
                 }
             )
             ;; Mint the bitcoin-call NFT with the token-id last-call-id + item
-            (unwrap-panic (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender)) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
-            (+ (var-get last-call-id) item) ;; spit this out in the list (f(item1), ...f(item100))
+            (unwrap! (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender) ERR-UNABLE-TO-MINT) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
+            (ok (+ (var-get last-call-id) item)) ;; spit this out in the list (f(item1), ...f(item100))
             )
-            u0) ;; spits out u0 if item is above
+            (ok u0)) ;; spits out u0 if item is above
 )
 
-(define-private (is-null (item uint))
-    (not (is-eq item u0))
+(define-private (is-null (item (response uint uint))) ;; it's (ok u1),(ok u2) ... (err u1011) (ok u0)
+    (not (is-eq item (ok u0)))
 )
+
 
 
 (define-constant indices
@@ -154,8 +164,8 @@
     u91 u92 u93 u94 u95 u96 u97 u98 u99 u100))
 
 
-(define-data-var user-calls (list 100 uint) (list )) ;; initialized at an empty list
-
+(define-data-var user-calls (list 100 (response uint uint)) (list )) ;; initialized at an empty list
+(define-data-var helper-list (list 100 (response uint uint)) (list ))
 ;; ///////////////////////////////////////////////////////////////////////////////////////
 
 (define-public (exercise (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
