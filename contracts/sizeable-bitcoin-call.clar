@@ -29,12 +29,14 @@
 (define-constant ERR-UNABLE-TO-UNLOCK (err u2006))
 (define-constant ERR-NOT-TOKEN-OWNER (err u2007))
 (define-constant ERROR-GETTING-BALANCE (err "err-getting-balance"))
-(define-constant ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET (err "err-unable-to-lock-underlying-asset"))
+(define-constant ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET (err "err-unable-to-lock-underlying-asset")) 
+(define-constant ERR-TOO-MANY-CALLS (err "err-too-many-calls")) 
 
 (define-constant ERR-TOKEN-ID-NOT-FOUND (err u1007)) ;; clarity wants the same type in all path which is something I am trying to get familiar with
 (define-constant ERR-INVALID-PRINCIPAL (err u1008))
 (define-constant ERR-TOKEN-EXPIRED (err u1009))
-(define-constant ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE (err u1010))
+(define-constant ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE (err u1010)) 
+(define-constant ERR-UNABLE-TO-MINT (err u1011))
 
 ;; (define-constant SBTC_DISPLAY_FACTOR u300000)
 (define-constant SBTC_ROUND_LOT_FACTOR u3000000)
@@ -47,7 +49,9 @@
 ;;
 (define-non-fungible-token bitcoin-call uint) ;; a 'call' is simply an NFT that represents the right to buy 3m sats at a strike date in 2100 blocks for a strike price of 1000 stx
 (define-data-var last-call-id uint u0)
+(define-data-var next-call-id uint u0)
 (define-data-var helper-uint uint u0) ;; number of calls
+(define-data-var strike-helper uint u0) ;; number of calls
 
 ;; data maps
 ;;
@@ -82,6 +86,7 @@
         ;; clarity doesn't support recursion, 
         ;; so we need to use a helper function / fold / map / can someone suggest something?
         (var-set helper-uint number-of-calls)
+        (var-set strike-helper strike-price)
 
         ;; (map helper-quite-a-few user-options) ;; where user-options is a list of call options tokens
         ;; and in the helper-quite-a-few is set the options data map
@@ -89,9 +94,69 @@
         ;; (var-set last-call-id token-id );; outside of the while loop, increment as many times as there are lots to lock
         (unwrap! (contract-call? wrapped-btc-contract transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) ;; outside of the loop, lock all the lots at once
         ;; (ok (var-get last-call-id))
-        (ok (map helper-quite-a-few indices))
+
+        (if (is-eq (var-get user-calls) (list ))
+            (begin
+            (var-set user-calls (filter is-null (map helper-quite-a-few indices))) ;; this spits out a list of call options token ids and updates the next-call-id
+            )
+            (var-set user-calls (unwrap! (as-max-len? (concat (var-get user-calls) (filter is-null (map helper-quite-a-few indices))) u100) ERR-TOO-MANY-CALLS))
+        )
+              
+        (var-set last-call-id (var-get next-call-id)) ;; this allows me to keep track of the last call id 
+
+        (ok (var-get user-calls))
     )
 )
+
+
+;; now I don't want to override in user-calls when item is >u0
+
+;; private functions
+;;
+;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
+;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
+
+(define-private (helper-quite-a-few (item uint))
+        (if (<= item (var-get helper-uint))
+            (begin
+            (var-set next-call-id (+ (var-get next-call-id) u1)) ;; for some reason the last lines of the branches of if must match in type! 
+            (map-set call-data (+ (var-get last-call-id) item)
+                { 
+                    counterparty : tx-sender,
+                    btc-locked : SBTC_ROUND_LOT_FACTOR, ;; this is 3m sats sBTC
+                    strike-price: (var-get strike-helper),
+                    strike-height: (+ block-height call-LENGTH),
+                }
+            )
+            ;; Mint the bitcoin-call NFT with the token-id last-call-id + item
+            (unwrap-panic (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender)) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
+            (+ (var-get last-call-id) item) ;; spit this out in the list (f(item1), ...f(item100))
+            )
+            u0) ;; spits out u0 if item is above
+)
+
+(define-private (is-null (item uint))
+    (not (is-eq item u0))
+)
+
+
+(define-constant indices
+  (list
+    u1 u2 u3 u4 u5 u6 u7 u8 u9 u10
+    u11 u12 u13 u14 u15 u16 u17 u18 u19 u20
+    u21 u22 u23 u24 u25 u26 u27 u28 u29 u30
+    u31 u32 u33 u34 u35 u36 u37 u38 u39 u40
+    u41 u42 u43 u44 u45 u46 u47 u48 u49 u50
+    u51 u52 u53 u54 u55 u56 u57 u58 u59 u60
+    u61 u62 u63 u64 u65 u66 u67 u68 u69 u70
+    u71 u72 u73 u74 u75 u76 u77 u78 u79 u80
+    u81 u82 u83 u84 u85 u86 u87 u88 u89 u90
+    u91 u92 u93 u94 u95 u96 u97 u98 u99 u100))
+
+
+(define-data-var user-calls (list 100 uint) (list )) ;; initialized at an empty list
+
+;; ///////////////////////////////////////////////////////////////////////////////////////
 
 (define-public (exercise (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
     (let 
@@ -149,72 +214,5 @@
     )
 )
 
-;; private functions
-;;
-;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
-;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
 
-(define-private (helper-quite-a-few (item uint))
-        (if (<= item (var-get helper-uint))
-            (+ (var-get last-call-id) item)
-            u0)
-
-)
-
-(define-private (hungush) 
-    (let 
-        ( 
-            (user-options (map helper-quite-a-few indices))
-        )
-        (var-set user-calls user-options)
-        ;; on peut mapper sur user-options
-        (map set-options-data user-options)
-
-    ) 
-)
-
-(define-private (set-options-data )
-    (let
-        (
-            (token-id (var-get last-call-id))
-        )
-        (map-set call-data token-id
-            { 
-                counterparty : tx-sender,
-                btc-locked : u3000000, ;; SBTC_ROUND_LOT_FACTOR, ;; this is 3m sats sBTC
-                strike-price: u1000000000,
-                strike-height:u2101
-            }
-        )       
-    )
-)
-
-
-
-(define-constant indices
-  (list
-    u1 u2 u3 u4 u5 u6 u7 u8 u9 u10
-    u11 u12 u13 u14 u15 u16 u17 u18 u19 u20
-    u21 u22 u23 u24 u25 u26 u27 u28 u29 u30
-    u31 u32 u33 u34 u35 u36 u37 u38 u39 u40
-    u41 u42 u43 u44 u45 u46 u47 u48 u49 u50
-    u51 u52 u53 u54 u55 u56 u57 u58 u59 u60
-    u61 u62 u63 u64 u65 u66 u67 u68 u69 u70
-    u71 u72 u73 u74 u75 u76 u77 u78 u79 u80
-    u81 u82 u83 u84 u85 u86 u87 u88 u89 u90
-    u91 u92 u93 u94 u95 u96 u97 u98 u99 u100))
-
-(define-data-var user-calls (list 100 uint)
-
-(list 
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0
-    u0 u0 u0 u40 u0 u0 u0 u0 u0 u0))
 

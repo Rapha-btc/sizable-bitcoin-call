@@ -34,10 +34,37 @@ command:
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-Next exercise: 
-modify the code to enable the creation of a list containing standardized options for each user, and then use the 'map' function to iterate.
+<h1>Exercise #2 for beginners</h1>
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+So now, we want to mint 6 Bitcoin calls by sending 18 million sats to the contract "sizeable-bitcoin-call.clar" and we want to be issued 6 bitcoin-calls, but the 3 first tokens have a strike of 1000 STX whereas the 3 following ones have a strike of 1230 STX.
+
+0. Run "clarinet console"
+console" from the contracts folder and perform the following steps:
+
+1. Mint yourself 18 million satoshis (sats) from sbtc using the command:
+<h6>(contract-call? .sbtc mint u19000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)</h6>
+
+2. Mint yourself 3 Bitcoin-calls of a total of 9 million satoshis (sats) - 3 million each - at a strike of 1000 STX from using the command:
+<h6>(contract-call? .sizeable-bitcoin-call mint 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u9000000 u1000000000)</h6>
+
+3. Mint yourself 3 Bitcoin-calls of a total of 9 million satoshis (sats) - 3 million sats each - at a strike of 1230 STX from using the command:
+<h6>(contract-call? .sizeable-bitcoin-call mint 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u9000000 u1230000000)</h6>
+
+3. Get the asset maps using the command:
+<h6>::get_assets_maps</h6>
+
+4. Transfer the Bitcoin call token "u1" to a new owner, identified by their principal ID 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
+<h6>(contract-call? .sizeable-bitcoin-call transfer u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
+
+5. Change the transaction sender to 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
+<h6>::set_tx_sender ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG</h6>
+
+6. Advance the chain tip by 5 blocks.
+
+7. Exercise the option and verify that the 3 million sats were received by the new owner using the command:
+<h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call exercise 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u1)</h6>
 
 - Call option Bitcoin, Bitcoin is collateralized
 - Put option Bitcoin, the other asset is collateralized (stx / usda)
