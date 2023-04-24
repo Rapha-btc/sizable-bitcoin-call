@@ -31,7 +31,8 @@ command:
 
 7. Exercise the option and verify that the 3 million sats were received by the new owner using the command:
 <h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-call exercise 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u1)</h6>
-![image](https://user-images.githubusercontent.com/6700158/233876754-c89ac815-629d-4599-a9f9-c09a8cd1a89a.png)
+
+![sizeable](https://user-images.githubusercontent.com/6700158/233876845-ec3808bd-559e-46f7-8c04-a6d0922270d9.png)
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
