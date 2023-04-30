@@ -31,6 +31,8 @@
 (define-constant ERROR-GETTING-BALANCE (err "err-getting-balance"))
 (define-constant ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET (err "err-unable-to-lock-underlying-asset")) 
 (define-constant ERR-TOO-MANY-CALLS (err "err-too-many-calls")) 
+(define-constant ERR-TOO-MANY-CALLS-2 (err u2008)) 
+(define-constant ERR-NO-EXERCISER-CALLS (err u2009))
 
 (define-constant ERR-TOKEN-ID-NOT-FOUND (err u1007)) ;; clarity wants the same type in all path which is something I am trying to get familiar with
 (define-constant ERR-INVALID-PRINCIPAL (err u1008))
@@ -45,14 +47,34 @@
 
 (define-constant SBTC-PRINCIPAL 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc) ;; ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM is the 1rst address in the simulated environment
 
+(define-constant indices
+  (list
+    u1 u2 u3 u4 u5 u6 u7 u8 u9 u10
+    u11 u12 u13 u14 u15 u16 u17 u18 u19 u20
+    u21 u22 u23 u24 u25 u26 u27 u28 u29 u30
+    u31 u32 u33 u34 u35 u36 u37 u38 u39 u40
+    u41 u42 u43 u44 u45 u46 u47 u48 u49 u50
+    u51 u52 u53 u54 u55 u56 u57 u58 u59 u60
+    u61 u62 u63 u64 u65 u66 u67 u68 u69 u70
+    u71 u72 u73 u74 u75 u76 u77 u78 u79 u80
+    u81 u82 u83 u84 u85 u86 u87 u88 u89 u90
+    u91 u92 u93 u94 u95 u96 u97 u98 u99 u100))
+
 ;; data vars
 ;;
-(define-non-fungible-token bitcoin-call uint) ;; a 'call' is simply an NFT that represents the right to buy 3m sats at a strike date in 2100 blocks for a strike price of 1000 stx
 (define-data-var last-call-id uint u0)
 (define-data-var next-call-id uint u0)
 (define-data-var helper-uint uint u0) ;; number of calls
 (define-data-var strike-helper uint u0) ;; number of calls
 
+(define-data-var user-calls (list 100 (response uint uint)) (list )) ;; initialized at an empty list // this is counterparty-calls who originates a call
+(define-data-var helper-list (list 100 (response uint uint)) (list ))
+(define-data-var helper-btc-contract principal SBTC-PRINCIPAL) ;; this is the principal of the contract that holds the underlying asset
+
+;; maybe they should be able to buy a whole bunch at once?
+
+;; a sizeable-bitcoin call is represented by an NFT token id bitcoin-call and data stored in call-data map
+(define-non-fungible-token bitcoin-call uint) ;; a 'call' is simply an NFT that represents the right to buy 3m sats at a strike date in 2100 blocks for a strike price of 1000 stx
 ;; data maps
 ;;
 (define-map call-data uint { 
@@ -60,13 +82,15 @@
         btc-locked: uint, ;; this is always 3m sats sBTC
         strike-price: uint, ;; 1000 stx? 950 stx? protect me against a drop below 950 stx per 3m sats sBTC
         strike-height: uint,
+        was-transferred-once: bool ;; this is to keep track of whether we have the token-id in a buyer-call list or not?
     }
 )
-;; ./.......................................
-;; try an use fold here or map instead of the while loop?
+;; define a map called exos where the key is a principal and the value is a list of uints of maximum lenght 100
+(define-map exerciser-calls principal {exos: (list 100 uint)}) ;; a list of calls owned by a user who is not a counterparty of these token-ids
+;; a list of calls owned by a user who is not a counterparty of these token-ids
 
-;;..........................................................................
-;;public functions
+;;public and private functions
+;;
 
 (define-public (mint (wrapped-btc-contract <wrapped-btc-trait>) (btc-locked uint) (strike-price uint)) 
    (let
@@ -110,61 +134,6 @@
     )
 )
 
-(define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
-   (if (is-err result) result current)  
-)
-
-
-;; now I don't want to override in user-calls when item is >u0
-
-;; private functions
-;;
-;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
-;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
-
-(define-private (helper-quite-a-few (item uint))
-        (if (<= item (var-get helper-uint))
-            (begin
-            (var-set next-call-id (+ (var-get next-call-id) u1)) ;; for some reason the last lines of the branches of if must match in type! 
-            (map-set call-data (+ (var-get last-call-id) item)
-                { 
-                    counterparty : tx-sender,
-                    btc-locked : SBTC_ROUND_LOT_FACTOR, ;; this is 3m sats sBTC
-                    strike-price: (var-get strike-helper),
-                    strike-height: (+ block-height call-LENGTH),
-                }
-            )
-            ;; Mint the bitcoin-call NFT with the token-id last-call-id + item
-            (unwrap! (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender) ERR-UNABLE-TO-MINT) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
-            (ok (+ (var-get last-call-id) item)) ;; spit this out in the list (f(item1), ...f(item100))
-            )
-            (ok u0)) ;; spits out u0 if item is above
-)
-
-(define-private (is-null (item (response uint uint))) ;; it's (ok u1),(ok u2) ... (err u1011) (ok u0)
-    (not (is-eq item (ok u0)))
-)
-
-
-
-(define-constant indices
-  (list
-    u1 u2 u3 u4 u5 u6 u7 u8 u9 u10
-    u11 u12 u13 u14 u15 u16 u17 u18 u19 u20
-    u21 u22 u23 u24 u25 u26 u27 u28 u29 u30
-    u31 u32 u33 u34 u35 u36 u37 u38 u39 u40
-    u41 u42 u43 u44 u45 u46 u47 u48 u49 u50
-    u51 u52 u53 u54 u55 u56 u57 u58 u59 u60
-    u61 u62 u63 u64 u65 u66 u67 u68 u69 u70
-    u71 u72 u73 u74 u75 u76 u77 u78 u79 u80
-    u81 u82 u83 u84 u85 u86 u87 u88 u89 u90
-    u91 u92 u93 u94 u95 u96 u97 u98 u99 u100))
-
-
-(define-data-var user-calls (list 100 (response uint uint)) (list )) ;; initialized at an empty list
-(define-data-var helper-list (list 100 (response uint uint)) (list ))
-;; ///////////////////////////////////////////////////////////////////////////////////////
-
 (define-public (exercise (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
     (let 
         (
@@ -194,6 +163,119 @@
     )
 )
 
+(define-public (exercise-all-of-my-exerciser-calls (wrapped-btc-contract <wrapped-btc-trait>))
+    (let 
+        (
+            (tx-exerciser-calls (unwrap! (map-get? exerciser-calls tx-sender) (err "err-no-exerciseable-calls")))
+            (exos (get exos tx-exerciser-calls))
+            (next-exos (list ))
+        )
+        ;; (var-set helper-btc-contract wrapped-btc-contract) ;; it's already the good principal and throws an error here for the trait?!
+        ;; (assert! (fold check-exercise exos true) (err "unable-to-exercise"))
+        (fold check-exercise exos true) ;; I don't know if this appropriate but it seems to work :P
+        (map-set exerciser-calls tx-sender {exos: next-exos})
+        ;; (ok (var-get next-exos))
+        (ok true)
+    )
+)
+;; I don't know what unchecked data is, probably not tested - #[allow(unchecked_data)]
+(define-public (transfer (token-id uint) (sender principal) (recipient principal))
+    
+        ;; let's fetch was-transfered-once from the call-data
+        (let 
+            (
+                (test true)
+                (recipient-calls (default-to {exos: (list )} (map-get? exerciser-calls recipient))) ;; i default to list u0...
+                (recipient-exos (get exos recipient-calls))
+                (next-recipient-exos (unwrap! (as-max-len? (append recipient-exos token-id) u100) ERR-TOO-MANY-CALLS-2))
+                (sender-calls (default-to {exos: (list )} (map-get? exerciser-calls sender)))
+                (sender-exos (get exos sender-calls))
+                
+                (call-info (unwrap! (map-get? call-data token-id) ERR-TOKEN-ID-NOT-FOUND))
+                (originator (get counterparty call-info))
+                (was-transferred (get was-transferred-once call-info))
+            )
+            
+            (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER) ;; only the owner can transfer the token
+
+            ;; if was-transfered-once is none, and if exerciser-recipient is none, 
+            ;; then map-set exerciser-calls from recipient to a list with token-id 
+            (if (not was-transferred) ;; no sender-calls so no need to filter it out with token-id
+                (begin
+                    (map-set call-data token-id (merge call-info {was-transferred-once: true})) 
+                    ;; if recipient is not the originator
+                    (if (not (is-eq recipient originator))
+                    (map-set exerciser-calls recipient {exos: next-recipient-exos})
+                    true
+                    )
+                )
+                (begin
+                    ;; if recipient is not the originator
+                    (if (not (is-eq recipient originator))
+                    (map-set exerciser-calls recipient {exos: next-recipient-exos})
+                    true
+                    )
+                    ;; filter out sender-exos with token-id
+                    (var-set helper-uint token-id)
+                    (map-set exerciser-calls sender {exos: (filter is-not-token sender-exos)})
+                )
+            )
+           (nft-transfer? bitcoin-call token-id sender recipient)  
+            ;; (ok was-transferred)
+        )
+)
+
+(define-private (is-not-token (item uint)) 
+    (not (is-eq item (var-get helper-uint)))
+)
+
+(define-public (transfer3 (token-id uint) (sender principal) (recipient principal))
+    (begin
+        (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER) ;; only the owner can transfer the token
+        (nft-transfer? bitcoin-call token-id sender recipient)
+    )
+) 
+
+;; private functions
+;;
+(define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
+   (if (is-err result) result current)  
+)
+(define-private (check-exercise (current uint) (result bool))
+    (let 
+    (
+    (result-mint-i (exercise SBTC-PRINCIPAL current)) ;; ideally do not execute this is result is false?
+    )
+    ;; (var-get helper-btc-contract)
+    (if (is-ok result-mint-i) true false)
+    )
+)
+
+;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
+;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
+(define-private (helper-quite-a-few (item uint))
+        (if (<= item (var-get helper-uint))
+            (begin
+            (var-set next-call-id (+ (var-get next-call-id) u1)) ;; for some reason the last lines of the branches of if must match in type! 
+            (map-set call-data (+ (var-get last-call-id) item)
+                { 
+                    counterparty : tx-sender,
+                    btc-locked : SBTC_ROUND_LOT_FACTOR, ;; this is 3m sats sBTC
+                    strike-price: (var-get strike-helper),
+                    strike-height: (+ block-height call-LENGTH),
+                    was-transferred-once: false ;; verify if this doesn't cause any problems
+                }
+            )
+            ;; Mint the bitcoin-call NFT with the token-id last-call-id + item
+            (unwrap! (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender) ERR-UNABLE-TO-MINT) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
+            (ok (+ (var-get last-call-id) item)) ;; spit this out in the list (f(item1), ...f(item100))
+            )
+            (ok u0)) ;; spits out u0 if item is above
+)
+
+(define-private (is-null (item (response uint uint))) ;; it's (ok u1),(ok u2) ... (err u1011) (ok u0)
+    (not (is-eq item (ok u0)))
+)
 
 ;; read only functions
 ;;
@@ -213,13 +295,8 @@
     (map-get? call-data token-id)
 )
 
-;; #[allow(unchecked_data)]
-(define-public (transfer (token-id uint) (sender principal) (recipient principal))
-    (begin
-        (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER) ;; only the owner can transfer the token
-        (nft-transfer? bitcoin-call token-id sender recipient)
-    )
+(define-read-only (get-exerciser-calls (buyer-owner principal))
+    (map-get? exerciser-calls buyer-owner)
 )
-
 
 

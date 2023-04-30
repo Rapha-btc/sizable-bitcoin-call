@@ -70,6 +70,45 @@ console" from the contracts folder and perform the following steps:
 
 ![sizeable folded](https://user-images.githubusercontent.com/6700158/234094834-d5aab652-20e3-43a6-b6b6-9bf9ea3e8d85.png)
 
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+<h1>Now let's exercise all of my calls in one go?</h1>
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+0. Run "clarinet console"
+console" from the contracts folder and perform the following steps:
+
+1. Mint yourself 18 million satoshis (sats) from sbtc using the command:
+<h6>(contract-call? .sbtc mint u19000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)</h6>
+
+2. Mint yourself 3 Bitcoin-calls of a total of 9 million satoshis (sats) - 3 million each - at a strike of 1000 STX from using the command:
+<h6>(contract-call? .sizeable-bitcoin-call mint 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u9000000 u1000000000)</h6>
+
+4. Transfer the Bitcoin call tokens to a new owner, identified by their principal ID 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
+<h6>(contract-call? .sizeable-bitcoin-call transfer u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
+<h6>(contract-call? .sizeable-bitcoin-call transfer u2 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
+<h6>(contract-call? .sizeable-bitcoin-call transfer u3 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
+
+5. Look up the list of exerciseable bitcoin calls you have
+
+<h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call get-exerciser-calls 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)</h6>
+
+<h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call get-exerciser-calls 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
+
+6. Get the asset maps using the command:
+<h6>::get_assets_maps</h6>
+
+7. Change the transaction sender to 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
+<h6>::set_tx_sender ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG</h6>
+
+8. (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call exercise-all-of-my-exerciser-calls 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc)
+
+9. Get the asset maps using the command:
+<h6>::get_assets_maps</h6>
+
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 - Call option Bitcoin, Bitcoin is collateralized
