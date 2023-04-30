@@ -107,6 +107,9 @@ console" from the contracts folder and perform the following steps:
 
 9. Get the asset maps using the command:
 <h6>::get_assets_maps</h6>
+![image](https://user-images.githubusercontent.com/6700158/235331168-02068c05-16fd-4fa3-8ab5-89fe15d89d3f.png)
+
+![image](https://user-images.githubusercontent.com/6700158/235331152-99766516-b542-4375-bd68-5c960f80edac.png)
 
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
