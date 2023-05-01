@@ -151,15 +151,18 @@
         (asserts! (is-eq (unwrap! (nft-get-owner? bitcoin-call token-id) ERR-TOKEN-ID-NOT-FOUND) tx-sender) ERR-NOT-TOKEN-OWNER) ;; only the owner of the call can exercise it
         (asserts! (>= strike-height block-height) ERR-TOKEN-EXPIRED) ;; the call expires and can be exercised only before the strike date
         (asserts! (>=  stx-balance strike-price) ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE)
-        
+        ;; if asserts returns an error it exits the control flow
+
         ;; (unwrap-panic (contract-call? wrapped-btc-contract get-balance tx-sender))
 
         ;; owner gets sBTC, counterparty gets STX => hence it's a call option
         (try! (as-contract (contract-call? wrapped-btc-contract transfer btc-locked tx-sender owner none))) ;; the bitcoin-call contract has the sbtc balance and sends it to the owner
         (try! (stx-transfer? strike-price owner counterparty)) ;; the owner sends the STX to the counterparty
+        ;; if try is an error or none it exits the control flow
+        
         ;; burn the call
         (try! (nft-burn? bitcoin-call token-id tx-sender))
-        (ok (map-delete call-data token-id))
+        (ok (map-delete call-data token-id)) ;; this cannot return false because call-info in let would have thrown an error and exit if call-data token-id doesn't exist
     )
 )
 
@@ -169,13 +172,14 @@
             (tx-exerciser-calls (unwrap! (map-get? exerciser-calls tx-sender) (err "err-no-exerciseable-calls")))
             (exos (get exos tx-exerciser-calls))
             (next-exos (list ))
+
+            (mint-em-all (asserts! (fold check-exercise exos true) (err "err-minting-all"))) ;; I don't know if this appropriate but it seems to work :P)
         )
         ;; (var-set helper-btc-contract wrapped-btc-contract) ;; it's already the good principal and throws an error here for the trait?!
-        ;; (assert! (fold check-exercise exos true) (err "unable-to-exercise"))
-        (fold check-exercise exos true) ;; I don't know if this appropriate but it seems to work :P
+        ;; (assert! (fold check-exercise exos true) (err "unable-to-exercise")) 
         (map-set exerciser-calls tx-sender {exos: next-exos})
         ;; (ok (var-get next-exos))
-        (ok true)
+        (ok mint-em-all)
     )
 )
 ;; I don't know what unchecked data is, probably not tested - #[allow(unchecked_data)]
@@ -241,15 +245,24 @@
 (define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
    (if (is-err result) result current)  
 )
-(define-private (check-exercise (current uint) (result bool))
+(define-private (check-exercise (current uint) (result bool ))
+    (begin
+    (if result 
     (let 
-    (
-    (result-mint-i (exercise SBTC-PRINCIPAL current)) ;; ideally do not execute this is result is false?
-    )
+    ((result-mint-i (exercise SBTC-PRINCIPAL current))) ;; this never returns an error/none/or false because exercise exits control flow if there's an error
     ;; (var-get helper-btc-contract)
-    (if (is-ok result-mint-i) true false)
+    (if (is-ok result-mint-i) true false) ;; hence this is always true? but if it returns false, there is no change to the logic and the exit is taken care inside the exercise function
+    ;; thought of changing the functioning of this if false arrives at any point but seems unnecessary?
+    ;; and then exit control flow in main function if false is the final result
+    ;; (if (is-err result) result current)    
+    )
+    false)
     )
 )
+;; idea: test whether result is false, and stop calling exercise if it is and return false forever in fold
+;; else return true
+;; 
+
 
 ;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
 ;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
