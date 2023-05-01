@@ -171,15 +171,17 @@
         (
             (tx-exerciser-calls (unwrap! (map-get? exerciser-calls tx-sender) (err "err-no-exerciseable-calls")))
             (exos (get exos tx-exerciser-calls))
-            (next-exos (list ))
+            ;; (next-exos (list ))
 
-            (mint-em-all (asserts! (fold check-exercise exos true) (err "err-minting-all"))) ;; I don't know if this appropriate but it seems to work :P)
+            (mint-em-all (asserts! (fold check-exercise exos true) (err "err-exercising-all"))) ;; I don't know if this appropriate but it seems to work :P)
         )
         ;; (var-set helper-btc-contract wrapped-btc-contract) ;; it's already the good principal and throws an error here for the trait?!
-        ;; (assert! (fold check-exercise exos true) (err "unable-to-exercise")) 
-        (map-set exerciser-calls tx-sender {exos: next-exos})
+        
+        ;; (map-set exerciser-calls tx-sender {exos: next-exos})
+        (map-delete exerciser-calls tx-sender)
         ;; (ok (var-get next-exos))
-        (ok mint-em-all)
+        ;; (ok mint-em-all)
+        (ok tx-exerciser-calls)
     )
 )
 ;; I don't know what unchecked data is, probably not tested - #[allow(unchecked_data)]
