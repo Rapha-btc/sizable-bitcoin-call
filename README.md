@@ -103,7 +103,9 @@ console" from the contracts folder and perform the following steps:
 7. Change the transaction sender to 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
 <h6>::set_tx_sender ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG</h6>
 
-8. (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call exercise-all-of-my-exerciser-calls 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc)
+8. Exercise them all:
+
+<h6>(contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sizeable-bitcoin-call exercise-all-of-my-exerciser-calls 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc)</h6>
 
 9. Get the asset maps using the command:
 <h6>::get_assets_maps</h6>
