@@ -39,6 +39,11 @@
 (define-constant ERR-TOKEN-EXPIRED (err u1009))
 (define-constant ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE (err u1010)) 
 (define-constant ERR-UNABLE-TO-MINT (err u1011))
+(define-constant ERR-NOT-EXPIRED (err u1012))
+(define-constant ERR-CLAIMABLE-ONLY-BY-COUNTERPARTY (err u1013))
+(define-constant ERR-IN-RECLAIM-CAPITAL (err u1014))
+(define-constant ERR-NFT-OWNER (err u1015))
+(define-constant ERR-NO-CONTRACT (err u1016))
 
 ;; (define-constant SBTC_DISPLAY_FACTOR u300000)
 (define-constant SBTC_ROUND_LOT_FACTOR u3000000)
@@ -46,6 +51,7 @@
 (define-constant call-LENGTH u2100) ;; 2100 blocks in the future
 
 (define-constant SBTC-PRINCIPAL 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc) ;; ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM is the 1rst address in the simulated environment
+(define-constant YIN-YANG 'SP000000000000000000002Q6VF78)
 
 (define-constant indices
   (list
@@ -169,10 +175,12 @@
 (define-public (exercise-all-of-my-exerciser-calls (wrapped-btc-contract <wrapped-btc-trait>))
     (let 
         (
-            (tx-exerciser-calls (unwrap! (map-get? exerciser-calls tx-sender) (err "err-no-exerciseable-calls")))
+            (tx-exerciser-calls (unwrap! (map-get? exerciser-calls tx-sender) (err "err-no-exercisable-calls")))
             (exos (get exos tx-exerciser-calls))
             ;; (next-exos (list ))
 
+            ;; maybe we need to filter out the calls that have expired here before folding them all?
+            ;; the expired ones don't need to be in exerciser-calls for "exercisable calls"
             (mint-em-all (asserts! (fold check-exercise exos true) (err "err-exercising-all"))) ;; I don't know if this appropriate but it seems to work :P)
         )
         ;; (var-set helper-btc-contract wrapped-btc-contract) ;; it's already the good principal and throws an error here for the trait?!
@@ -190,7 +198,6 @@
         ;; let's fetch was-transfered-once from the call-data
         (let 
             (
-                (test true)
                 (recipient-calls (default-to {exos: (list )} (map-get? exerciser-calls recipient))) ;; i default to list u0...
                 (recipient-exos (get exos recipient-calls))
                 (next-recipient-exos (unwrap! (as-max-len? (append recipient-exos token-id) u100) ERR-TOO-MANY-CALLS-2))
@@ -235,13 +242,6 @@
     (not (is-eq item (var-get helper-uint)))
 )
 
-(define-public (transfer3 (token-id uint) (sender principal) (recipient principal))
-    (begin
-        (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER) ;; only the owner can transfer the token
-        (nft-transfer? bitcoin-call token-id sender recipient)
-    )
-) 
-
 ;; private functions
 ;;
 (define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
@@ -249,6 +249,14 @@
 )
 (define-private (check-exercise (current uint) (result bool ))
     (begin
+    (if (> (get strike-height (default-to  { 
+        counterparty: tx-sender,
+        btc-locked: u1, 
+        strike-price: u1,  
+        strike-height: (+ block-height u1), ;; is superior to block-height
+        was-transferred-once: true  
+    };; I just want to default to something that is higher than block-height if map-get doesn't find anything
+    (map-get? call-data current))) block-height) ;; if block-height is less than striek-height then exercise and spit true, else just spit true
     (if result 
     (let 
     ((result-mint-i (exercise SBTC-PRINCIPAL current))) ;; this never returns an error/none/or false because exercise exits control flow if there's an error
@@ -259,6 +267,7 @@
     ;; (if (is-err result) result current)    
     )
     false)
+    true) ;; do nothing if block-height is more than strike-height, and inside the "true" wrapped with a begin do we want to burn the NFT, probably not, we do that in the redeem function when the counterparty re-claims sBTC from contract
     )
 )
 ;; idea: test whether result is false, and stop calling exercise if it is and return false forever in fold
@@ -314,4 +323,67 @@
     (map-get? exerciser-calls buyer-owner)
 )
 
+;; Reclaiming capital from contract
+(define-public (counterparty-reclaim (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
+    (let 
+        (
+            (call-info (unwrap! (get-call-data token-id) ERR-TOKEN-ID-NOT-FOUND))
+            (counterparty (get counterparty call-info))
+            (sbtc-quantity (get btc-locked call-info))
+            (strike-height-token (get strike-height call-info))
+            (token-owner (unwrap! (nft-get-owner? bitcoin-call token-id) ERR-NFT-OWNER))
+            (t-sender tx-sender)
+        )
+        (asserts! (< strike-height-token block-height) ERR-NOT-EXPIRED)
+        (asserts! (is-eq counterparty tx-sender) ERR-CLAIMABLE-ONLY-BY-COUNTERPARTY)
+        ;; (unwrap! (contract-call? wrapped-btc-contract transfer sbtc-quantity (as-contract tx-sender) tx-sender none) ERR-IN-RECLAIM-CAPITAL) ;; reclaim sBTC capital from contract
+        (try! (as-contract (contract-call? wrapped-btc-contract transfer sbtc-quantity tx-sender t-sender none)))
+        (try! (nft-burn? bitcoin-call token-id token-owner))
+        (ok (map-delete call-data token-id))
+    )    
+)
 
+;; (define-data-var sBTC-contract-helper <wrapped-btc-trait> SBTC-PRINCIPAL)
+;; error: trait references can not be stored
+;; x 1 error detected
+(define-data-var sBTC-contract-helper principal SBTC-PRINCIPAL)
+
+(define-private (reclaim-yy (token-id uint) (result (response bool uint)))
+    (let 
+        (
+            (call-info (unwrap! (get-call-data token-id) ERR-TOKEN-ID-NOT-FOUND))
+            (counterparty (get counterparty call-info))
+            (sbtc-quantity (get btc-locked call-info))
+            (strike-height-token (get strike-height call-info))
+            (token-owner (unwrap! (nft-get-owner? bitcoin-call token-id) ERR-NFT-OWNER))
+            (the-sbtc (var-get sBTC-contract-helper))
+        )
+        (asserts! (< strike-height-token block-height) ERR-NOT-EXPIRED)
+        (asserts! (is-eq counterparty tx-sender) ERR-CLAIMABLE-ONLY-BY-COUNTERPARTY)
+        ;; (unwrap! (contract-call? the-sbtc transfer sbtc-quantity (as-contract tx-sender) tx-sender none) ERR-IN-RECLAIM-CAPITAL) ;; reclaim sBTC capital from contract
+        ;; the line above won't work! because we can't store a trait reference in a data-var?
+        (unwrap! (contract-call? SBTC-PRINCIPAL transfer sbtc-quantity (as-contract tx-sender) tx-sender none) ERR-IN-RECLAIM-CAPITAL) ;; reclaim sBTC capital from contract
+        (try! (nft-burn? bitcoin-call token-id token-owner))
+        (ok (map-delete call-data token-id))
+    )    
+)
+
+(define-public (reclaiming)
+    (let
+    (
+    (tx-sender-exos (default-to {exos: (list )} (map-get? exerciser-calls tx-sender)))
+    (exo-list (get exos tx-sender-exos))
+    )
+    (fold reclaim-yy exo-list (ok true)) ;; for some reason I don't get my capital back and it spits out ok true!
+    )
+)
+
+
+(define-public (reclaiming-yy-capital (wrapped-btc-contract <wrapped-btc-trait>) (list-tokens (list 100 uint)))
+    (fold reclaim-yy list-tokens (ok true)) ;; if one of the reclaim-yy fails, it retro-actively undo all prior transactions
+    ;; (begin 
+    ;; (var-set sBTC-contract-helper wrapped-btc-contract) 
+    ;; the line above won't work! because we can't store a trait reference in a data-var?
+)
+
+;; would be great to transfer a list of tokens at once

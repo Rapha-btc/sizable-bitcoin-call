@@ -84,7 +84,7 @@ console" from the contracts folder and perform the following steps:
 <h6>(contract-call? .sbtc mint u19000000 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM)</h6>
 
 2. Mint yourself 3 Bitcoin-calls of a total of 9 million satoshis (sats) - 3 million each - at a strike of 1000 STX from using the command:
-<h6>(contract-call? .sizeable-bitcoin-call mint 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u9000000 u1000000000)</h6>
+<h6>(contract-call? .sizeable-bitcoin-call mint 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc u15000000 u1000000000)</h6>
 
 4. Transfer the Bitcoin call tokens to a new owner, identified by their principal ID 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG using the command:
 <h6>(contract-call? .sizeable-bitcoin-call transfer u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 'ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG)</h6>
