@@ -94,6 +94,11 @@
 ;; define a map called exos where the key is a principal and the value is a list of uints of maximum lenght 100
 (define-map exerciser-calls principal {exos: (list 100 uint)}) ;; a list of calls owned by a user who is not a counterparty of these token-ids
 ;; a list of calls owned by a user who is not a counterparty of these token-ids
+;; this above should be called exercisable-calls... and sizable instead of sizeable :P
+
+;; let's create a list of reclaimable for the counterparty so they can reclaim their capital in one go!
+(define-map reclaimable-calls principal {reclaimable: (list 100 uint)}) ;; a list of calls owned by a user who is not a counterparty of these token-ids
+;; this is added only when it is minted!
 
 ;;public and private functions
 ;;
@@ -181,7 +186,7 @@
 
             ;; maybe we need to filter out the calls that have expired here before folding them all?
             ;; the expired ones don't need to be in exerciser-calls for "exercisable calls"
-            (mint-em-all (asserts! (fold check-exercise exos true) (err "err-exercising-all"))) ;; I don't know if this appropriate but it seems to work :P)
+            (exercise-em-all (asserts! (fold check-exercise exos true) (err "err-exercising-all"))) ;; I don't know if this appropriate but it seems to work :P)
         )
         ;; (var-set helper-btc-contract wrapped-btc-contract) ;; it's already the good principal and throws an error here for the trait?!
         
@@ -201,6 +206,7 @@
                 (recipient-calls (default-to {exos: (list )} (map-get? exerciser-calls recipient))) ;; i default to list u0...
                 (recipient-exos (get exos recipient-calls))
                 (next-recipient-exos (unwrap! (as-max-len? (append recipient-exos token-id) u100) ERR-TOO-MANY-CALLS-2))
+
                 (sender-calls (default-to {exos: (list )} (map-get? exerciser-calls sender)))
                 (sender-exos (get exos sender-calls))
                 
@@ -292,6 +298,10 @@
             )
             ;; Mint the bitcoin-call NFT with the token-id last-call-id + item
             (unwrap! (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender) ERR-UNABLE-TO-MINT) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
+            ;; this is the only instance of minting the calls, so now we're simply adding the token to the reclaimable list
+            ;; (var-set reclaimable-calls (cons (+ (var-get last-call-id) item) (var-get reclaimable-calls)))
+            (map-set reclaimable-calls tx-sender {reclaimable: (unwrap! (as-max-len? (append (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls tx-sender))) item) u100) ERR-TOO-MANY-CALLS-2)})
+
             (ok (+ (var-get last-call-id) item)) ;; spit this out in the list (f(item1), ...f(item100))
             )
             (ok u0)) ;; spits out u0 if item is above
@@ -323,6 +333,15 @@
     (map-get? exerciser-calls buyer-owner)
 )
 
+(define-read-only (get-reclaimable-calls (counterparty principal))
+    (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls counterparty)))
+)
+
+(define-read-only (get-user-calls (counterparty principal))
+    (var-get user-calls) ;; this is useless and re-write code by replacing with reclaimable-calls
+)
+
+;; public function
 ;; Reclaiming capital from contract
 (define-public (counterparty-reclaim (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
     (let 
@@ -348,42 +367,44 @@
 ;; x 1 error detected
 (define-data-var sBTC-contract-helper principal SBTC-PRINCIPAL)
 
-(define-private (reclaim-yy (token-id uint) (result (response bool uint)))
-    (let 
-        (
-            (call-info (unwrap! (get-call-data token-id) ERR-TOKEN-ID-NOT-FOUND))
-            (counterparty (get counterparty call-info))
-            (sbtc-quantity (get btc-locked call-info))
-            (strike-height-token (get strike-height call-info))
-            (token-owner (unwrap! (nft-get-owner? bitcoin-call token-id) ERR-NFT-OWNER))
-            (the-sbtc (var-get sBTC-contract-helper))
+(define-private (reclaim (token-id uint) (result bool))
+    (begin
+    (if (< (get strike-height (default-to  { 
+        counterparty: tx-sender,
+        btc-locked: u1, 
+        strike-price: u1,  
+        strike-height: (- block-height u1), ;; is inferior to block-height
+        was-transferred-once: true  
+    };; I just want to default to something that is higher than block-height if map-get doesn't find anything
+    (map-get? call-data token-id))) block-height) ;; if block-height is less than striek-height then exercise and spit true, else just spit true
+        (if result
+            (let 
+                (
+                (result-reclaim-token (counterparty-reclaim SBTC-PRINCIPAL token-id)) ;; I call the counterparty-reclaim 
+                )
+                true
+            )
+                false
         )
-        (asserts! (< strike-height-token block-height) ERR-NOT-EXPIRED)
-        (asserts! (is-eq counterparty tx-sender) ERR-CLAIMABLE-ONLY-BY-COUNTERPARTY)
-        ;; (unwrap! (contract-call? the-sbtc transfer sbtc-quantity (as-contract tx-sender) tx-sender none) ERR-IN-RECLAIM-CAPITAL) ;; reclaim sBTC capital from contract
-        ;; the line above won't work! because we can't store a trait reference in a data-var?
-        (unwrap! (contract-call? SBTC-PRINCIPAL transfer sbtc-quantity (as-contract tx-sender) tx-sender none) ERR-IN-RECLAIM-CAPITAL) ;; reclaim sBTC capital from contract
-        (try! (nft-burn? bitcoin-call token-id token-owner))
-        (ok (map-delete call-data token-id))
+        true) ;; avoid the case where there is no data in the call-data map, like when it is exercised
     )    
 )
 
+
+
 (define-public (reclaiming)
     (let
-    (
-    (tx-sender-exos (default-to {exos: (list )} (map-get? exerciser-calls tx-sender)))
-    (exo-list (get exos tx-sender-exos))
-    )
-    (fold reclaim-yy exo-list (ok true)) ;; for some reason I don't get my capital back and it spits out ok true!
+        (
+        (tx-reclaimable (unwrap! (map-get? reclaimable-calls tx-sender) (err "no reclaimable calls"))) ;; this has to be an unwwrap to exit flow and not a default, else the empty list in fold won't go thru?
+        (reclaimable-list (get reclaimable tx-reclaimable))
+        (reclaim-em-all (asserts! (fold reclaim reclaimable-list true) (err "failed to reclaim all")))
+        )
+        (map-delete reclaimable-calls tx-sender)
+        (ok reclaim-em-all)
+        ;; (ok reclaimable-list)
     )
 )
 
-
-(define-public (reclaiming-yy-capital (wrapped-btc-contract <wrapped-btc-trait>) (list-tokens (list 100 uint)))
-    (fold reclaim-yy list-tokens (ok true)) ;; if one of the reclaim-yy fails, it retro-actively undo all prior transactions
-    ;; (begin 
-    ;; (var-set sBTC-contract-helper wrapped-btc-contract) 
-    ;; the line above won't work! because we can't store a trait reference in a data-var?
-)
-
-;; would be great to transfer a list of tokens at once
+;; TO do:
+;; would be great to transfer a # of tokens at once (they're all the same per strike!)
+;; need to merge user-calls and replace it by claimable-calls
