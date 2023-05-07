@@ -1,13 +1,13 @@
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-Latest
+<h1>Latest</h1>
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-1. Run: 
-<h1>clarinet test tests/sizeable-bitcoin-call_test.ts</h1>
+1. Run a few tests
+<h6>clarinet test tests/sizeable-bitcoin-call_test.ts</h6>
 
-2. TO do:
+2. To do list
 - Transfer a # of tokens in 1 go (if tokens are same strike)
 - need to delete user-calls and replace it by claimable-calls
 
