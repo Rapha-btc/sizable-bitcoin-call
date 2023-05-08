@@ -5,8 +5,9 @@
 ;; let's take the code from bitcoin-call, and now add the possibility for a user to 
 ;; print 100 call options of 3m sats each, at a strike price measure and exercised in STX
 ;; MEV concerns for this project - fingers crossed blockchain engineers at work on Stakcs!
-;; so the user has 3 bitcoin in the form of a wraped-btc-trait, and decides to lock them in this contract to receive 100 bitfcoin calls
-;; in the form of an "bitcoin-call" NFT from this contract
+
+;; so the user has 3 bitcoin in the form of a wraped-btc-trait, and decides to lock them in this contract to receive 100 bitcoin calls
+;; in the form of a "bitcoin-call" NFT from this contract
 
 ;; Idea from Rafa at the airport while waiting a flight:
 ;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
@@ -71,11 +72,15 @@
 (define-data-var last-call-id uint u0)
 (define-data-var next-call-id uint u0)
 (define-data-var helper-uint uint u0) ;; number of calls
-(define-data-var strike-helper uint u0) ;; number of calls
+(define-data-var strike-helper uint u0) 
+(define-data-var expiration-helper uint u0)
 
-(define-data-var user-calls (list 100 (response uint uint)) (list )) ;; initialized at an empty list // this is counterparty-calls who originates a call
+
 (define-data-var helper-list (list 100 (response uint uint)) (list ))
 (define-data-var helper-btc-contract principal SBTC-PRINCIPAL) ;; this is the principal of the contract that holds the underlying asset
+
+(define-data-var helper-sender principal YIN-YANG)
+(define-data-var helper-recipient principal YIN-YANG)
 
 ;; maybe they should be able to buy a whole bunch at once?
 
@@ -110,7 +115,8 @@
             (sbtc-get-balance (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc get-balance tx-sender) ERROR-GETTING-BALANCE));; get the balance of the sender in the sbtc contract
             (strike-height (+ block-height call-LENGTH)) ;; the strike date is 2100 blocks in the future
             (number-of-calls (/ btc-locked SBTC_ROUND_LOT_FACTOR))
-            ;; (list-user-output (map helper-quite-a-few indices))
+            
+            (counter-calls (get-reclaimable-calls tx-sender)) ;; get the reclaimable calls of the counterparty
         )
         (asserts! (>= btc-locked SBTC_ROUND_LOT_FACTOR) ERR-MIN-QUANTITY-NOT-MET) ;; modulo will return the tested number if it is lesser than the divider, hence exit in that case
         (asserts! (is-eq (mod btc-locked SBTC_ROUND_LOT_FACTOR) u0) ERR-QUANTITY-NOT-ROUND-LOT) ;; let's print call options representing 3m sats per call, user needs to give a factor of 3m sats sBTC
@@ -118,30 +124,25 @@
         (asserts! (> strike-price u0) ERR-STRIKE-PRICE-IS-ZERO)
         
         ;; now we need to mint as many NFTs as there are lots to lock
-        ;; clarity doesn't support recursion, 
+        ;; clarity doesn't support recursions
         ;; so we need to use a helper function / fold / map / can someone suggest something?
         (var-set helper-uint number-of-calls)
         (var-set strike-helper strike-price)
 
-        ;; (map helper-quite-a-few user-options) ;; where user-options is a list of call options tokens
-        ;; and in the helper-quite-a-few is set the options data map
+        ;; outside of the loop, lock all the capital at once;; outside of the while loop, increment as many number-of-calls
+        (unwrap! (contract-call? wrapped-btc-contract transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) 
 
-        ;; (var-set last-call-id token-id );; outside of the while loop, increment as many times as there are lots to lock
-        (unwrap! (contract-call? wrapped-btc-contract transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) ;; outside of the loop, lock all the lots at once
-        ;; (ok (var-get last-call-id))
-
-        (if (is-eq (var-get user-calls) (list ))   
-            (var-set user-calls (filter is-null (map helper-quite-a-few indices))) ;; this spits out a list of call options token ids and updates the next-call-id
-            (var-set user-calls (unwrap! (as-max-len? (concat (var-get user-calls) (filter is-null (map helper-quite-a-few indices))) u100) ERR-TOO-MANY-CALLS))
+        (if (is-eq counter-calls (list ));; this spits out a list of call options token ids and updates the next-call-id
+            (map-set reclaimable-calls tx-sender {reclaimable: (map pour-unwrapper (filter is-null (map helper-quite-a-few indices)))})
+            (map-set reclaimable-calls tx-sender {reclaimable: (unwrap! (as-max-len? (concat counter-calls (map pour-unwrapper (filter is-null (map helper-quite-a-few indices)))) u100) ERR-TOO-MANY-CALLS)})
         )
         
-        ;; here we can fold on the user-calls and try before it to exit control flow if there is an error
-        ;; (asserts! boolean-expr (err thrown)) 
-        (unwrap! (fold check-minting-err (var-get user-calls) (ok u0)) (err "unable-to-mint"));; ERR-UNABLE-TO-MINT)
+        ;; It is useless to fold on this below is useless because unwrap! on (filter is-null (map helper-quite-a-few indices))
+        ;; because helper-quite-a-few has an unwrap! on the nft-mint? which should exit flow if none or error 
 
         (var-set last-call-id (var-get next-call-id)) ;; this allows me to keep track of the last call id 
 
-        (ok (var-get user-calls))
+        (ok (get-reclaimable-calls tx-sender))
     )
 )
 
@@ -199,7 +200,6 @@
 )
 ;; I don't know what unchecked data is, probably not tested - #[allow(unchecked_data)]
 (define-public (transfer (token-id uint) (sender principal) (recipient principal))
-    
         ;; let's fetch was-transfered-once from the call-data
         (let 
             (
@@ -244,12 +244,130 @@
         )
 )
 
-(define-private (is-not-token (item uint)) 
-    (not (is-eq item (var-get helper-uint)))
+(define-public (transfer-same-strikes (my-calls (list 100 uint)) (sender principal) (recipient principal)) 
+    (let 
+        (
+            ;; on a besoin de fetcher les strikes-height de my-calls en mappant sur my-calls / call-data
+            (my-expirations (map check-expirations my-calls))
+            ;; on a besoin de fetcher les strikes-price de my-calls / call-data
+            (my-strikes (map check-strikes my-calls))
+
+            
+        )
+        
+        ;; ;; var-set expiration-helper to the fist index of my-expirations
+        ;; (var-set expiration-helper (fold get-first my-expirations u0)) ;; double check unwrap-panic is okay here
+
+        ;; ;; on va asserter que les calls sont dans le meme range de strike-height - say 7 blocks range
+        ;; (asserts! (fold same-expirations my-expirations true) (err "cant-bulk-transfer-different-expirations"))
+    
+        ;; var-set strike-helper to the fist index of my-strikes
+        (var-set strike-helper u0)
+
+        ;; on va asserter que les calls sont tous du meme strike-price
+        (asserts! (fold same-strikes my-strikes true) (err "cant-bulk-transfer-different-strikes"))
+
+
+        ;; si c'est le cas
+        ;; on va transferer les calls au recipient en mappant sur my-calls et en faisant un transfer pour chaque call
+
+        ;; var-setting sender and recipient
+        (var-set helper-sender sender)
+        (var-set helper-recipient recipient)
+
+        (ok (fold transfer-bulk my-calls true))
+    )
+)
+(define-private (get-first (current uint) (result uint))
+    (if (is-eq result u0) result current)
+)
+
+;; (define-public (test-inputlist-synthax (my-calls (list 100 uint)))
+;;     (ok ( my-calls u1)) ;; that is not the function I want! I want the opposite
+;; )
+;; list-ref
+;;>> (contract-call? .sizeable-bitcoin-call test-inputlist-synthax (list u1 u2))
+;; (ok (u1 u2))
+
+
+;; transfer-same-strikes private functions
+(define-private (transfer-bulk (current uint) (result bool))
+    (if result
+        (let 
+            (
+                
+                (is-transferred (transfer current (var-get helper-sender) (var-get helper-recipient)))
+                
+            ) 
+            true
+        )
+        false
+    )
+)
+
+(define-private (same-expirations (current uint) (result bool)) 
+    (begin
+    (if result    
+        (if (is-eq (- current (var-get expiration-helper)) u7) 
+            (begin
+            (var-set expiration-helper current)
+            true
+            )
+            false ;; else branch
+        ) 
+    false
+    )
+    )
+)
+
+(define-private (same-strikes (current uint) (result bool))
+    (begin
+    (if result    
+    (if (is-eq (var-get strike-helper) u0);; the 1rst time
+        (begin 
+        (var-set strike-helper current)
+        true
+        )
+        (if (is-eq (- current (var-get strike-helper)) u0) ;; else branch
+            (begin
+            (var-set strike-helper current)
+            true
+            )
+            false
+        ) 
+    )
+    false
+    )
+    )
+)
+(define-private (check-expirations (item uint)) 
+    (get strike-height (default-to  { 
+        counterparty: tx-sender,
+        btc-locked: u1, 
+        strike-price: u1,  
+        strike-height: u0, ;; default to u0
+        was-transferred-once: true  
+    };; I just want to default to something if map-get doesn't find anything
+    (map-get? call-data item)))
+)
+
+(define-private (check-strikes (item uint))
+    (get strike-price (default-to  { 
+        counterparty: tx-sender,
+        btc-locked: u1, 
+        strike-price: u0, ;; default to u0 
+        strike-height: u0,  
+        was-transferred-once: true  
+    };; I just want to default to something if map-get doesn't find anything
+    (map-get? call-data item)))
 )
 
 ;; private functions
 ;;
+(define-private (is-not-token (item uint)) 
+    (not (is-eq item (var-get helper-uint)))
+)
+
 (define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
    (if (is-err result) result current)  
 )
@@ -278,13 +396,11 @@
 )
 ;; idea: test whether result is false, and stop calling exercise if it is and return false forever in fold
 ;; else return true
-;; 
-
 
 ;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
 ;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
 (define-private (helper-quite-a-few (item uint))
-        (if (<= item (var-get helper-uint))
+        (if (<= item (var-get helper-uint)) ;; looping over number of calls = helper uint
             (begin
             (var-set next-call-id (+ (var-get next-call-id) u1)) ;; for some reason the last lines of the branches of if must match in type! 
             (map-set call-data (+ (var-get last-call-id) item)
@@ -305,6 +421,11 @@
             (ok (+ (var-get last-call-id) item)) ;; spit this out in the list (f(item1), ...f(item100))
             )
             (ok u0)) ;; spits out u0 if item is above
+)
+;; can we map with a helper function that has an unwrap inside like above?
+
+(define-private (pour-unwrapper (item (response uint uint)))
+    (if (is-ok item) (unwrap-panic item) u0)
 )
 
 (define-private (is-null (item (response uint uint))) ;; it's (ok u1),(ok u2) ... (err u1011) (ok u0)
@@ -335,10 +456,6 @@
 
 (define-read-only (get-reclaimable-calls (counterparty principal))
     (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls counterparty)))
-)
-
-(define-read-only (get-user-calls (counterparty principal))
-    (var-get user-calls) ;; this is useless and re-write code by replacing with reclaimable-calls
 )
 
 ;; public function
@@ -406,5 +523,6 @@
 )
 
 ;; TO do:
-;; would be great to transfer a # of tokens at once (they're all the same per strike!)
-;; need to merge user-calls and replace it by claimable-calls
+;; would be great to transfer a # of tokens at once if they're all the same per strike!
+;; ;; debug the same expirations, setting the first one is pbmatic?
+;; ;; asserting out if I've missed any in it?
