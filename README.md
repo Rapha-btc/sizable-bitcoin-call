@@ -8,8 +8,8 @@
 <h6>clarinet test tests/sizeable-bitcoin-call_test.ts</h6>
 
 2. To do list
-- Transfer a # of tokens in 1 go (if tokens are same strike)
-- need to delete user-calls and replace it by claimable-calls
+- Verify the Fold function will exit control flow if spit out an error
+- because this won't happen inside helper-loop-function
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
