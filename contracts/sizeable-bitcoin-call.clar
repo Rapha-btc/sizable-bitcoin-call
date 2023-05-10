@@ -88,11 +88,19 @@
 (define-non-fungible-token bitcoin-call uint) ;; a 'call' is simply an NFT that represents the right to buy 3m sats at a strike date in 2100 blocks for a strike price of 1000 stx
 ;; data maps
 ;;
+
+;; this is for Ali:
+;; when you create/mint the NFT, you send the 3 million sats BTC to the contract and you define the Strike price
+;; meaning how much Stack should someone pay to access/unlock/buy these 3 million sats BTC which are escrowed in the contract
+;; if someone owns this NFT it gives them the right to unlock the capital escrowed in the contract
+;; at the price defined in the map and this right expires after 2100 blocks + block height of creation
+
+;; if you buy this NFT, you protect yourself from price of STX going down versus bitcoin
 (define-map call-data uint { 
         counterparty: principal,
-        btc-locked: uint, ;; this is always 3m sats sBTC
-        strike-price: uint, ;; 1000 stx? 950 stx? protect me against a drop below 950 stx per 3m sats sBTC
-        strike-height: uint,
+        btc-locked: uint, ;; this is always 3m sats sBTC 0.03 000 000
+        strike-price: uint, ;; 0.00 002 BTC/STX 1000 stx? 950 stx? protect me against a drop below 950 stx per 3m sats sBTC
+        strike-height: uint, ;; this right that you have if you own this Bitcoin call NFT expires
         was-transferred-once: bool ;; this is to keep track of whether we have the token-id in a buyer-call list or not?
     }
 )
@@ -244,6 +252,7 @@
         )
 )
 
+
 (define-public (transfer-same-strikes (my-calls (list 100 uint)) (sender principal) (recipient principal)) 
     (let 
         (
@@ -255,11 +264,11 @@
             
         )
         
-        ;; ;; var-set expiration-helper to the fist index of my-expirations
-        ;; (var-set expiration-helper (fold get-first my-expirations u0)) ;; double check unwrap-panic is okay here
+        ;; var-set expiration-helper to the fist index of my-expirations
+        (var-set expiration-helper (fold get-first my-expirations u0)) ;; double check unwrap-panic is okay here
 
-        ;; ;; on va asserter que les calls sont dans le meme range de strike-height - say 7 blocks range
-        ;; (asserts! (fold same-expirations my-expirations true) (err "cant-bulk-transfer-different-expirations"))
+        ;; on va asserter que les calls sont dans le meme range de strike-height - say 7 blocks range
+        (asserts! (fold same-expirations my-expirations true) (err "cant-bulk-transfer-different-expirations"))
     
         ;; var-set strike-helper to the fist index of my-strikes
         (var-set strike-helper u0)
@@ -274,13 +283,16 @@
         ;; var-setting sender and recipient
         (var-set helper-sender sender)
         (var-set helper-recipient recipient)
-
-        (ok (fold transfer-bulk my-calls true))
+        
+        (ok (asserts! (fold transfer-bulk my-calls true) (err "err-bulk-transfer")))
+        ;; (ok (var-get expiration-helper))
+        
     )
 )
+
 (define-private (get-first (current uint) (result uint))
-    (if (is-eq result u0) result current)
-)
+  (if (is-eq result u0) current result))
+
 
 ;; (define-public (test-inputlist-synthax (my-calls (list 100 uint)))
 ;;     (ok ( my-calls u1)) ;; that is not the function I want! I want the opposite
@@ -297,9 +309,11 @@
             (
                 
                 (is-transferred (transfer current (var-get helper-sender) (var-get helper-recipient)))
-                
+                ;; this line above will not exit control flow even when transfer is called by not the owner of current that would exit out in line 226 of transfer function
+                ;; so I am discovering somthing no good here for the other fold function, I need to check this then!
+
             ) 
-            true
+            (is-ok is-transferred)
         )
         false
     )
@@ -308,8 +322,9 @@
 (define-private (same-expirations (current uint) (result bool)) 
     (begin
     (if result    
-        (if (is-eq (- current (var-get expiration-helper)) u7) 
+        (if (<= (- current (var-get expiration-helper)) u7) 
             (begin
+            (print (var-get expiration-helper))
             (var-set expiration-helper current)
             true
             )
