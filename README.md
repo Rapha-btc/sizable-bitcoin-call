@@ -12,9 +12,7 @@
 - do some test use cases
 - ask someone like Cargo if they can have a look
 
-> > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > =======
 > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > >
-> > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > 3ede0a1 (exiting control flow on mint if any nft-mint fails)
 
 <h1>A simple exercise for beginners</h1>
 
