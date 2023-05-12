@@ -15,11 +15,9 @@
 <<<<<<< HEAD
 ![image](https://github.com/Rapha-btc/sizable-bitcoin-call/assets/6700158/39fbfa27-6c6c-494a-a231-43f06e11aaff)
 
-
->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-=======
+> > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > =======
 > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > >
->>>>>>> 3ede0a1 (exiting control flow on mint if any nft-mint fails)
+> > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > 3ede0a1 (exiting control flow on mint if any nft-mint fails)
 
 <h1>A simple exercise for beginners</h1>
 

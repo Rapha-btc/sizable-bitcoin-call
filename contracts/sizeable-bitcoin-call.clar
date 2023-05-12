@@ -144,7 +144,7 @@
         ;; and it actually doesn't exit control flow, 
         ;; it spits an error in the list and goes on to the next item
         ;; here we asserts over the fold and exit all of the operations here if it fails
-        
+
         ;; now we exit control flow if any of these nft-mintSSS? calls failed!
         (asserts! (is-ok (fold check-minting-err (var-get helper-user-calls) (ok u0))) (err "unable-to-mint"))
         
