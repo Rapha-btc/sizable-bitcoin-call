@@ -9,11 +9,8 @@
 
 2. To do list
 
-- Verify the Fold function will exit control flow if spit out an error
-- because this won't happen inside helper-loop-function
-
-<<<<<<< HEAD
-![image](https://github.com/Rapha-btc/sizable-bitcoin-call/assets/6700158/39fbfa27-6c6c-494a-a231-43f06e11aaff)
+- do some test use cases
+- ask someone like Cargo if they can have a look
 
 > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > =======
 > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > > >
