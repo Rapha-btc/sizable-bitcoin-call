@@ -77,6 +77,7 @@
 
 
 (define-data-var helper-list (list 100 (response uint uint)) (list ))
+(define-data-var helper-user-calls (list 100 (response uint uint)) (list )) ;; this is a helper
 (define-data-var helper-btc-contract principal SBTC-PRINCIPAL) ;; this is the principal of the contract that holds the underlying asset
 
 (define-data-var helper-sender principal YIN-YANG)
@@ -89,11 +90,12 @@
 ;; data maps
 ;;
 
-;; this is for Ali:
-;; when you create/mint the NFT, you send the 3 million sats BTC to the contract and you define the Strike price
-;; meaning how much Stack should someone pay to access/unlock/buy these 3 million sats BTC which are escrowed in the contract
-;; if someone owns this NFT it gives them the right to unlock the capital escrowed in the contract
-;; at the price defined in the map and this right expires after 2100 blocks + block height of creation
+;; this is for Mom:
+;; when you create the CALL, you send the 3 million Bitcoin satoshis to the contract which will hold it in escrow
+;; at the same time you define the price in STX at which anyone who has the CALL can buy these 3 million satoshis at the predetermined STX price
+;; if someone owns this CALL, it gives them the right to receive these 3 million satoshis from the contract where it is escrowed
+;; in exchange for them sending the price in STX to the creator of this CALL 
+;; this right expires after 2100 blocks + block height of creation
 
 ;; if you buy this NFT, you protect yourself from price of STX going down versus bitcoin
 (define-map call-data uint { 
@@ -119,14 +121,12 @@
 (define-public (mint (wrapped-btc-contract <wrapped-btc-trait>) (btc-locked uint) (strike-price uint)) 
    (let
         (
-            (token-id (+ (var-get last-call-id) u1)) ;; increment the last call id before creating it
             (sbtc-get-balance (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc get-balance tx-sender) ERROR-GETTING-BALANCE));; get the balance of the sender in the sbtc contract
-            (strike-height (+ block-height call-LENGTH)) ;; the strike date is 2100 blocks in the future
             (number-of-calls (/ btc-locked SBTC_ROUND_LOT_FACTOR))
             
             (counter-calls (get-reclaimable-calls tx-sender)) ;; get the reclaimable calls of the counterparty
         )
-        (asserts! (>= btc-locked SBTC_ROUND_LOT_FACTOR) ERR-MIN-QUANTITY-NOT-MET) ;; modulo will return the tested number if it is lesser than the divider, hence exit in that case
+        (asserts! (>= btc-locked SBTC_ROUND_LOT_FACTOR) ERR-MIN-QUANTITY-NOT-MET) ;; modulo will return the tested number if it is lesser than the divider, hence exit in that case 
         (asserts! (is-eq (mod btc-locked SBTC_ROUND_LOT_FACTOR) u0) ERR-QUANTITY-NOT-ROUND-LOT) ;; let's print call options representing 3m sats per call, user needs to give a factor of 3m sats sBTC
         (asserts! (>= sbtc-get-balance btc-locked) ERR-INSUFFICIENT-UNDERLYING-BALANCE)
         (asserts! (> strike-price u0) ERR-STRIKE-PRICE-IS-ZERO)
@@ -136,17 +136,27 @@
         ;; so we need to use a helper function / fold / map / can someone suggest something?
         (var-set helper-uint number-of-calls)
         (var-set strike-helper strike-price)
+        (var-set next-call-id (var-get last-call-id))
+
+        (var-set helper-user-calls (filter is-null (map helper-quite-a-few indices)))
+
+        ;; (map helper-quite-a-few indices) can spit out an error
+        ;; and it actually doesn't exit control flow, 
+        ;; it spits an error in the list and goes on to the next item
+        ;; here we asserts over the fold and exit all of the operations here if it fails
+        
+        ;; now we exit control flow if any of these nft-mintSSS? calls failed!
+        (asserts! (is-ok (fold check-minting-err (var-get helper-user-calls) (ok u0))) (err "unable-to-mint"))
+        
+
+        (if (is-eq counter-calls (list ));; this spits out a list of call options token ids and updates the next-call-id
+            (map-set reclaimable-calls tx-sender {reclaimable: (map pour-unwrapper (var-get helper-user-calls))})
+            (map-set reclaimable-calls tx-sender {reclaimable: (unwrap! (as-max-len? (concat counter-calls (map pour-unwrapper (var-get helper-user-calls))) u100) ERR-TOO-MANY-CALLS)})
+        )
+        
 
         ;; outside of the loop, lock all the capital at once;; outside of the while loop, increment as many number-of-calls
         (unwrap! (contract-call? wrapped-btc-contract transfer btc-locked tx-sender (as-contract tx-sender) none) ERR-UNABLE-TO-LOCK-UNDERLYING-ASSET) 
-
-        (if (is-eq counter-calls (list ));; this spits out a list of call options token ids and updates the next-call-id
-            (map-set reclaimable-calls tx-sender {reclaimable: (map pour-unwrapper (filter is-null (map helper-quite-a-few indices)))})
-            (map-set reclaimable-calls tx-sender {reclaimable: (unwrap! (as-max-len? (concat counter-calls (map pour-unwrapper (filter is-null (map helper-quite-a-few indices)))) u100) ERR-TOO-MANY-CALLS)})
-        )
-        
-        ;; It is useless to fold on this below is useless because unwrap! on (filter is-null (map helper-quite-a-few indices))
-        ;; because helper-quite-a-few has an unwrap! on the nft-mint? which should exit flow if none or error 
 
         (var-set last-call-id (var-get next-call-id)) ;; this allows me to keep track of the last call id 
 
@@ -384,7 +394,12 @@
 )
 
 (define-private (check-minting-err (current (response uint uint)) (result (response uint uint)))
-   (if (is-err result) result current)  
+   (if (is-err result) result 
+   (begin
+    (var-set next-call-id (+ (var-get next-call-id) u1)) ;; the last-call-id will be incremented by next-call-id
+    current
+    )  
+   )
 )
 (define-private (check-exercise (current uint) (result bool ))
     (begin
@@ -417,7 +432,6 @@
 (define-private (helper-quite-a-few (item uint))
         (if (<= item (var-get helper-uint)) ;; looping over number of calls = helper uint
             (begin
-            (var-set next-call-id (+ (var-get next-call-id) u1)) ;; for some reason the last lines of the branches of if must match in type! 
             (map-set call-data (+ (var-get last-call-id) item)
                 { 
                     counterparty : tx-sender,
@@ -431,14 +445,12 @@
             (unwrap! (nft-mint? bitcoin-call (+ (var-get last-call-id) item) tx-sender) ERR-UNABLE-TO-MINT) ;; I wasn't able to unrwap this, so I improvised with this unwrap-panic and I get no error message!
             ;; this is the only instance of minting the calls, so now we're simply adding the token to the reclaimable list
             ;; (var-set reclaimable-calls (cons (+ (var-get last-call-id) item) (var-get reclaimable-calls)))
-            (map-set reclaimable-calls tx-sender {reclaimable: (unwrap! (as-max-len? (append (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls tx-sender))) item) u100) ERR-TOO-MANY-CALLS-2)})
+            ;; (map-set reclaimable-calls tx-sender {reclaimable: (unwrap! (as-max-len? (append (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls tx-sender))) item) u100) ERR-TOO-MANY-CALLS-2)})
 
             (ok (+ (var-get last-call-id) item)) ;; spit this out in the list (f(item1), ...f(item100))
             )
             (ok u0)) ;; spits out u0 if item is above
 )
-;; can we map with a helper function that has an unwrap inside like above?
-
 (define-private (pour-unwrapper (item (response uint uint)))
     (if (is-ok item) (unwrap-panic item) u0)
 )
@@ -446,7 +458,21 @@
 (define-private (is-null (item (response uint uint))) ;; it's (ok u1),(ok u2) ... (err u1011) (ok u0)
     (not (is-eq item (ok u0)))
 )
+;; (define-private (a-or-b (char (string-utf8 1)))
+;;   (begin
+;;     (var-set last-call-id (+ (var-get last-call-id) u1)) 
+;;     (asserts! (is-eq char u"a") (err u"b"))
+;;     (ok u"a")
+;;   )
+;; )
 
+;; (define-public (foo)
+;;   (begin
+;; ;;   (map a-or-b u"aba")
+;; ;;   (ok (var-get last-call-id))
+;;     (ok (map a-or-b u"aba"))
+;;   )
+;; )
 ;; read only functions
 ;;
 (define-read-only (get-last-token-id)
