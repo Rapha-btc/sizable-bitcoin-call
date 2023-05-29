@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bitcoin Call Options</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin:0; padding:0; box-sizing:border-box; }
+        .container { width: 80%; margin: 0 auto; padding: 20px; }
+        .section { margin-bottom: 20px; }
+        h1 { color: #333; }
+        table { width: 100%; }
+        th, td { padding: 10px; text-align: left; }
+        #numContractsDisplay { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bitcoin Call Options</h1>
+
+        <div class="section">
+            <h2>Create a Bitcoin Call Option</h2>
+            <form id="lockForm">
+                <p>Each call option locks 3 million Satoshis for 2100 blocks (~2 weeks) at a set strike price in STX.</p>
+                <label for="numContracts">Number of Contracts:</label><br>
+                <input type="range" id="numContracts" name="numContracts" min="1" max="100" step="1" value="1" oninput="numContractsDisplay.value = numContracts.value">
+                <output id="numContractsDisplay">1</output><br>
+                <label for="stacksPrice">Strike Price in Stacks:</label><br>
+                <input type="text" id="stacksPrice" name="stacksPrice"><br>
+                <button type="submit">Create Call Option(s)</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Available Bitcoin Call Options</h2>
+            <table id="contractsTable">
+                <tr>
+                    <th>Number of Contracts</th>
+                    <th>Total Satoshis</th>
+                    <th>Strike Price in Stacks</th>
+                    <th>Blocks Until Expiration</th>
+                    <th>Action</th>
+                </tr>
+                <!-- This is where available options will be listed -->
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Expired or Owned Bitcoin Call Options</h2>
+            <table id="claimTable">
+                <tr>
+                    <th>Number of Contracts</th>
+                    <th>Total Satoshis</th>
+                    <th>Strike Price in Stacks</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+                <!-- This is where expired/owned options will be listed -->
+            </table>
+        </div>
+    </div>
+</body>
+</html>
+<script src="https://unpkg.com/@stacks/blockchain-api-client/dist/index.umd.js"></script>
+<script src="https://unpkg.com/@stacks/transactions/dist/index.umd.js"></script>
+<script src="app.js"></script>
+

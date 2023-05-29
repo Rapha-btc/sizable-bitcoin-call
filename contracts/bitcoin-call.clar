@@ -111,24 +111,6 @@
     )
 )
 
-;; this is one of the reason why a non pro will have a head start, pros don't want to learn how to deal with loops in Clarity
-;; non-pros like me have everything to learn, so can start from scratch and why not a powerful and secured language like Clarity?
-
-        ;; ;; now we need to mint as many tokens as there are lots to lock, first we mint and then we define the data
-        ;; (while (>= number-of-lots-to-lock u0)
-        ;;     (try! (nft-mint? bitcoin-call token-id tx-sender))
-        ;;     (map-set call-data token-id
-        ;;         { 
-        ;;             counterparty : tx-sender,
-        ;;             btc-locked : SBTC_ROUND_LOT_FACTOR, ;; this is 3m sats sBTC
-        ;;             strike-price: strike-price, ;; this is the only user variable, whether I can buy the 3m sats sBTC lot at 950 stx or 1000 stx or whatever stx amount?
-        ;;             strike-height: strike-height ;; this is just block-height + u2100 (1 cycle)
-        ;;         }
-        ;;     )
-        ;;     (set token-id (+ token-id u1))
-        ;;     (set number-of-lots-to-lock (- number-of-lots-to-lock u1))
-        ;; )
-
 (define-public (exercise (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
     (let 
         (

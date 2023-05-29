@@ -1,26 +1,24 @@
-(use-trait wrapped-btc-trait .sip010-ft-trait.sip010-ft-trait) ;; any wrapped btc that is a sip-10 token can be collateralized, and we are testing it here with sbtc.clar but I should have called it not-not-btc.clar in reference to Doctor $uss cultural meme
-(impl-trait .sip009-nft-trait.sip009-nft-trait) ;; covered-calls are nfts + a map
+(use-trait wrapped-btc-trait .sip010-ft-trait.sip010-ft-trait) ;; any wrapped btc that is a sip-10 token can be collateralized, and we are testing it here with sbtc.clar but how about xbtc (althou we are not advocates of centralized tokens)
+(impl-trait .sip009-nft-trait.sip009-nft-trait) ;; covered-calls are nfts + a data map
 ;; title: sizeable-bitcoin-call.clar
 ;; version 1
 ;; let's take the code from bitcoin-call, and now add the possibility for a user to 
-;; print 100 call options of 3m sats each, at a strike price measure and exercised in STX
+;; print 100 call options of 3m sats each, at a strike price in STX
 ;; MEV concerns for this project - fingers crossed blockchain engineers at work on Stakcs!
 
 ;; so the user has 3 bitcoin in the form of a wraped-btc-trait, and decides to lock them in this contract to receive 100 bitcoin calls
 ;; in the form of a "bitcoin-call" NFT from this contract
 
-;; Idea from Rafa at the airport while waiting a flight:
-;; A private function called helper-quite-a-few that takes a number N between 1 and 100 
-;; and spits out 0 if item is above number N, and last-token-Id + item otherwise. 
-;; Map quite-a-few u1, u2, u100
-;; Spits out last token id + 1, last token id + 2, last token id + N, u0 ... u0
-;; and perform the set mapping / deleting + token burning
-
-;; token definitions
-;; 
+;; When you create a CALL, you send 3 million Bitcoin satoshis to an escrow contract. 
+;; Simultaneously, you set the price in STX at which anyone with the CALL can purchase these satoshis. 
+;; Owning the CALL grants someone the right to receive the 3 million satoshis from the escrow contract by sending the predetermined STX price to the creator of the CALL. 
+;; This right expires after 2100 blocks plus the block height at creation.
 
 ;; constants
 ;;
+
+(define-constant CONTRACT-OWNER tx-sender)
+
 (define-constant ERR-INSUFFICIENT-UNDERLYING-BALANCE (err "err-insufficient-underlying-balance"))
 (define-constant ERR-STRIKE-PRICE-IS-ZERO (err "err-strike-price-cannot-be-zero"))
 (define-constant ERR-QUANTITY-NOT-ROUND-LOT (err "err-quantity-not-round-lot"))
@@ -50,6 +48,21 @@
 (define-constant SBTC_ROUND_LOT_FACTOR u3000000)
 (define-constant DISPLAY_FACTOR u100000000) ;; 100m sats = 1 btc
 (define-constant call-LENGTH u2100) ;; 2100 blocks in the future
+
+;; To do
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 1/ Define a commission that can be changed by the admin of the contract
+;; look up how this is done on btc-rocks or even nft-cc
+;; 2/ make the seller pay a commission to the contract owner of say 4% of the strike price
+;; 3/ allow the counterparty to cancel their call before expiration (if they own the call, they can cancel it)
+;; 4/ Extend the # of Calls by the admin of the contract -- deploy new contracts instead of this
+;; it's impossible to define a list of X elements where X can be changed by the admin in Clarity
+;; THIS can be changed by the admin of the contract 
+
+;; Tests
+;; when owner exercises u1 to u5, we have to clean up map-delete reclaimable calls?
+;; or is it left intentionnally u1... u5, u6 with u1 to u5 already exercised by owner and u6 active
+;; we don't keep track of counterparties in call-data map once the Calls are reclaimed?
 
 (define-constant SBTC-PRINCIPAL 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc) ;; ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM is the 1rst address in the simulated environment
 (define-constant YIN-YANG 'SP000000000000000000002Q6VF78)
@@ -83,19 +96,14 @@
 (define-data-var helper-sender principal YIN-YANG)
 (define-data-var helper-recipient principal YIN-YANG)
 
+(define-data-var commission uint u4)
+
 ;; maybe they should be able to buy a whole bunch at once?
 
 ;; a sizeable-bitcoin call is represented by an NFT token id bitcoin-call and data stored in call-data map
 (define-non-fungible-token bitcoin-call uint) ;; a 'call' is simply an NFT that represents the right to buy 3m sats at a strike date in 2100 blocks for a strike price of 1000 stx
 ;; data maps
 ;;
-
-;; this is for Mom:
-;; when you create the CALL, you send the 3 million Bitcoin satoshis to the contract which will hold it in escrow
-;; at the same time you define the price in STX at which anyone who has the CALL can buy these 3 million satoshis at the predetermined STX price
-;; if someone owns this CALL, it gives them the right to receive these 3 million satoshis from the contract where it is escrowed
-;; in exchange for them sending the price in STX to the creator of this CALL 
-;; this right expires after 2100 blocks + block height of creation
 
 ;; if you buy this NFT, you protect yourself from price of STX going down versus bitcoin
 (define-map call-data uint { 
@@ -172,6 +180,10 @@
             (btc-locked (get btc-locked call-info))
             (strike-height (get strike-height call-info))
             (strike-price (get strike-price call-info))
+
+            (price-to-seller (/ (* strike-price (- u100 (var-get commission))) u100)) ;; you have to multiply first because u96/u100 = u0
+            (price-to-protocol (- strike-price price-to-seller))
+
             ;; (exercise-quantity-stx (* (/ btc-locked DISPLAY_FACTOR) strike-price)) ;; price = STX / BTC, so this gives me some STX
             (owner tx-sender) ;; the owner exercises the option, and the counterparty complies
             (stx-balance (stx-get-balance tx-sender))
@@ -183,11 +195,14 @@
         (asserts! (>=  stx-balance strike-price) ERR-INSUFFICIENT-CAPITAL-TO-EXERCISE)
         ;; if asserts returns an error it exits the control flow
 
-        ;; (unwrap-panic (contract-call? wrapped-btc-contract get-balance tx-sender))
-
         ;; owner gets sBTC, counterparty gets STX => hence it's a call option
         (try! (as-contract (contract-call? wrapped-btc-contract transfer btc-locked tx-sender owner none))) ;; the bitcoin-call contract has the sbtc balance and sends it to the owner
-        (try! (stx-transfer? strike-price owner counterparty)) ;; the owner sends the STX to the counterparty
+        (try! (stx-transfer? price-to-seller owner counterparty)) ;; the owner sends the STX to the counterparty and commission to the protocol
+        (if (> price-to-protocol u0) 
+        (try! (stx-transfer? price-to-protocol owner CONTRACT-OWNER))
+        true
+        )
+
         ;; if try is an error or none it exits the control flow
         
         ;; burn the call
@@ -205,7 +220,7 @@
 
             ;; maybe we need to filter out the calls that have expired here before folding them all?
             ;; the expired ones don't need to be in exerciser-calls for "exercisable calls"
-            (exercise-em-all (asserts! (fold check-exercise exos true) (err "err-exercising-all"))) ;; I don't know if this appropriate but it seems to work :P)
+            (exercise-em-all (asserts! (fold check-exercise exos true) (err "err-exercising-all"))) ;; if one is exercised independently using (exercise function, than this functions errors out
         )
         ;; (var-set helper-btc-contract wrapped-btc-contract) ;; it's already the good principal and throws an error here for the trait?!
         
@@ -216,7 +231,7 @@
         (ok tx-exerciser-calls)
     )
 )
-;; I don't know what unchecked data is, probably not tested - #[allow(unchecked_data)]
+;; Transfer the call to another user
 (define-public (transfer (token-id uint) (sender principal) (recipient principal))
         ;; let's fetch was-transfered-once from the call-data
         (let 
@@ -257,6 +272,7 @@
                     (map-set exerciser-calls sender {exos: (filter is-not-token sender-exos)})
                 )
             )
+
            (nft-transfer? bitcoin-call token-id sender recipient)  
             ;; (ok was-transferred)
         )
@@ -473,31 +489,6 @@
 ;;     (ok (map a-or-b u"aba"))
 ;;   )
 ;; )
-;; read only functions
-;;
-(define-read-only (get-last-token-id)
-    (ok (var-get last-call-id))
-)
-
-(define-read-only (get-token-uri (token-id uint))
-    (ok none) ;; (some https://stx.is/sbtc-pdf)
-)
-
-(define-read-only (get-owner (token-id uint))
-    (ok (nft-get-owner? bitcoin-call token-id))
-)
-
-(define-read-only (get-call-data (token-id uint))
-    (map-get? call-data token-id)
-)
-
-(define-read-only (get-exerciser-calls (buyer-owner principal))
-    (map-get? exerciser-calls buyer-owner)
-)
-
-(define-read-only (get-reclaimable-calls (counterparty principal))
-    (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls counterparty)))
-)
 
 ;; public function
 ;; Reclaiming capital from contract
@@ -549,7 +540,6 @@
 )
 
 
-
 (define-public (reclaiming)
     (let
         (
@@ -563,7 +553,51 @@
     )
 )
 
-;; TO do:
-;; would be great to transfer a # of tokens at once if they're all the same per strike!
-;; ;; debug the same expirations, setting the first one is pbmatic?
-;; ;; asserting out if I've missed any in it?
+;; read only functions
+;;
+(define-read-only (get-last-token-id)
+    (ok (var-get last-call-id))
+)
+
+(define-read-only (get-token-uri (token-id uint))
+    (ok none) ;; (some https://stx.is/sbtc-pdf)
+)
+
+(define-read-only (get-owner (token-id uint))
+    (ok (nft-get-owner? bitcoin-call token-id))
+)
+
+(define-read-only (get-counterparty (token-id uint)) 
+    (let
+        (
+            (call-info (unwrap! (get-call-data token-id) ERR-TOKEN-ID-NOT-FOUND))
+        )
+    
+    (ok (get counterparty call-info))
+    )
+)
+
+(define-read-only (get-call-data (token-id uint))
+    (map-get? call-data token-id)
+)
+
+(define-read-only (get-exerciser-calls (buyer-owner principal))
+    (map-get? exerciser-calls buyer-owner)
+)
+
+(define-read-only (get-reclaimable-calls (counterparty principal))
+    (get reclaimable (default-to {reclaimable: (list )} (map-get? reclaimable-calls counterparty)))
+)
+
+(define-read-only (is-admin) 
+  (is-eq tx-sender CONTRACT-OWNER))
+
+
+  ;; Admin functions
+  ;;
+(define-public (set-commission (value uint)) 
+    (begin
+        (asserts! (is-admin)  (err "only-admin"))
+        (ok (var-set commission value))
+    )
+)
