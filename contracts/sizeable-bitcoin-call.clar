@@ -2,6 +2,7 @@
 (impl-trait .sip009-nft-trait.sip009-nft-trait) ;; covered-calls are nfts + a data map
 ;; title: sizeable-bitcoin-call.clar
 ;; version 1
+;; author: rapha.btc, coder apprentice year 0
 ;; let's take the code from bitcoin-call, and now add the possibility for a user to 
 ;; print 100 call options of 3m sats each, at a strike price in STX
 ;; MEV concerns for this project - fingers crossed blockchain engineers at work on Stakcs!
@@ -43,6 +44,9 @@
 (define-constant ERR-IN-RECLAIM-CAPITAL (err u1014))
 (define-constant ERR-NFT-OWNER (err u1015))
 (define-constant ERR-NO-CONTRACT (err u1016))
+
+(define-constant ERR-ONLY-OWNER-CAN-CANCEL (err u98760))
+(define-constant ERR-ONLY-UNTRANSFERRED-CALLS-CAN-BE-CANCELED (err u98761))
 
 ;; (define-constant SBTC_DISPLAY_FACTOR u300000)
 (define-constant SBTC_ROUND_LOT_FACTOR u3000000)
@@ -511,10 +515,6 @@
     )    
 )
 
-;; (define-data-var sBTC-contract-helper <wrapped-btc-trait> SBTC-PRINCIPAL)
-;; error: trait references can not be stored
-;; x 1 error detected
-(define-data-var sBTC-contract-helper principal SBTC-PRINCIPAL)
 
 (define-private (reclaim (token-id uint) (result bool))
     (begin
@@ -553,6 +553,28 @@
     )
 )
 
+(define-public (cancel-call (wrapped-btc-contract <wrapped-btc-trait>) (token-id uint))
+    (let
+        (   
+            (call-info (unwrap! (map-get? call-data token-id) ERR-TOKEN-ID-NOT-FOUND))
+            (counterparty (get counterparty call-info))
+            (owner (unwrap! (nft-get-owner? bitcoin-call token-id) ERR-NFT-OWNER))
+            (was-transferred (get was-transferred-once call-info))
+            (collateral (get btc-locked call-info))
+        )
+        ;; assert that counterparty = owner
+        (asserts! (is-eq counterparty owner) ERR-ONLY-OWNER-CAN-CANCEL)
+        ;; assert that was-transferred = false
+        (asserts! (is-eq was-transferred false) ERR-ONLY-UNTRANSFERRED-CALLS-CAN-BE-CANCELED)
+        
+        ;; send the sBTC back to the owner/counterparty
+        (try! (as-contract (contract-call? wrapped-btc-contract transfer collateral tx-sender counterparty none)))
+        ;; burn the token
+        (try! (nft-burn? bitcoin-call token-id owner))
+        ;; delete the call from the call-data map
+        (ok (map-delete call-data token-id))
+    )
+)
 ;; read only functions
 ;;
 (define-read-only (get-last-token-id)
